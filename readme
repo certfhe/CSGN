@@ -1,0 +1,15 @@
+certFHE library in C++ 
+
+To build on linux:
+1. cd certfhe-library/
+2. mkdir build
+3. cmake ../ 
+4. make
+
+To build on Windows:
+1. go to certfhe-library/
+2. make a folder build
+3. open a command prompt and make sure you have cmake 
+4. type cmake ../ from build folder
+5. open VS solution from build folder
+6. build all from VS
