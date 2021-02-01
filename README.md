@@ -1,7 +1,7 @@
 # certFHE - Bounded Fully Homomorphic Encryption from Monoid Algebras
 
 
-certFHE is a [fully homomorphic encryption (FHE)](https://en.wikipedia.org/wiki/Homomorphic_encryption) library that implements the scheme presented [here](http://certfhewiki.certsign.ro/wiki/CertSGN).
+certFHE is a [fully homomorphic encryption (FHE)](https://en.wikipedia.org/wiki/Homomorphic_encryption) library that implements the scheme presented [here](https://certfhewiki.certsign.ro/wiki/CertSGN).
 
 The library is implemented in C++.
 
