@@ -5,6 +5,7 @@ certFHE is a [fully homomorphic encryption (FHE)](https://en.wikipedia.org/wiki/
 
 The library is implemented in C++.
 
+Documentation can be found [here](https://certfhe.gitbook.io/certfhe/).
 
 ## Building certFHE library
 
