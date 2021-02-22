@@ -341,6 +341,9 @@ SecretKey::SecretKey(const SecretKey& secKey)
 
 SecretKey::~SecretKey()
 {
+	for (uint64_t i = 0; i < length; i++)
+		s[i] = 0;
+
     if (this->s != nullptr)
     {
         delete [] this->s;
