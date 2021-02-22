@@ -35,41 +35,37 @@ Then, open the VS solution from build server and build all from VS.
 
 ```cpp
 // initializing library (using local time as seed for further pseudo random generator calls)
-initializeLibrary();
+certFHE::Library::initializeLibrary();
 
 // setup the certFHE context 
-certFHEContext ctx;
-ctx.N = 1247;
-ctx.D = 16;
+certFHE::Context context(1247,16);
 
 // the secret key
 uint64_t* s = NULL;
 
-// generate the secret key 
-setup(ctx, s);
+certFHE::SecretKey seckey(context);
 
 // use two bits: 0,1
-char b0 = 0x00;
-char b1 = 0x01;
+Plaintext p1(1);
+Plaintext p0(0);
 
-// ciphertexts to be used
-certFHECtxt ctxt0,ctxt1;
-
-// encrypt the bits using secret key scheme
-encrypt(ctxt0,b0,ctx,s);
-encrypt(ctxt1,b1,ctx,s);
+// encrypt the bits using secret key 
+Ciphertext c1 = seckey.encrypt(p1);
+Ciphertext c0 = seckey.encrypt(p0);
 
 // multiply two ciphertexts 
-certFHECtxt* m =  multiply(ctx,ctxt0,ctxt1);
+c1 = c1*c2;
+c1 *= c2;
 
 // add a ciphertexts
-certFHECtxt* r = add (*m,ctxt1);
+c1 = c1+c2;
+c1 += c2;
 
 // decrypt the result
-uint64_t dec = decrypt(*r, ctx, s);
+ Plaintext result = seckey.decrypt(c1);
 
 //print the results 
-printf("enc ( %d ) * enc ( %d ) + enc ( %d ) ) = enc ( %d ) \n\n",b0,b1,b1,dec);
+std::cout<<result;
 ```
 
 # License
