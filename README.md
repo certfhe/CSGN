@@ -41,8 +41,6 @@ certFHE::Library::initializeLibrary();
 certFHE::Context context(1247,16);
 
 // the secret key
-uint64_t* s = NULL;
-
 certFHE::SecretKey seckey(context);
 
 // use two bits: 0,1
@@ -62,7 +60,7 @@ c1 = c1+c2;
 c1 += c2;
 
 // decrypt the result
- Plaintext result = seckey.decrypt(c1);
+Plaintext result = seckey.decrypt(c1);
 
 //print the results 
 std::cout<<result;
