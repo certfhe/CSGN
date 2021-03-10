@@ -80,7 +80,7 @@ Permutation Permutation::operator+(const Permutation& permB)
 Permutation& Permutation::operator+=(const Permutation& permB)
 {
     if (length != permB.getLength())
-        return Permutation();         
+        return *this;         
 
     uint64_t *p = new uint64_t[length];
     uint64_t *pB = permB.getPermutation();

@@ -130,7 +130,12 @@ namespace certFHE
          * DO NOT DELETE THIS POINTER
         **/
         uint64_t* getKey() const;
-
+		
+		/**
+		 * Setters
+		**/
+		void setKey(uint64_t*s, uint64_t len);
+		
         /**
          * Get the size in bytes of the secret key
          * @return value: size in bytes

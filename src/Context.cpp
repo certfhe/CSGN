@@ -3,6 +3,8 @@
 using namespace certFHE;
 using namespace std;
 
+namespace certFHE {
+
 #pragma region Constructors and destructor
   
 Context::Context(const Context& context)
@@ -35,7 +37,7 @@ Context::~Context()
 
 #pragma region Operators
 
-ostream& certFHE::operator<<(ostream &out, const Context &c)
+ostream& operator<<(ostream &out, const Context &c)
 {
 	out<<"N= "<<c.getN()<<endl;
 	out<<"D= "<<c.getD()<<endl;
@@ -89,3 +91,5 @@ void Context::setD(uint64_t d)
 }
 
 #pragma endregion
+
+}

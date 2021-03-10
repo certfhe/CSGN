@@ -3,9 +3,11 @@
 using namespace certFHE;
 using namespace std;
 
+namespace certFHE {
+
 #pragma region Operators
 
-ostream& certFHE::operator<<(ostream &out, const Plaintext &c)
+ostream& operator<<(ostream &out, const Plaintext &c)
 {
    
     char val = c.getValue();
@@ -50,3 +52,5 @@ void Plaintext::setValue(unsigned char value)
 }
 
 #pragma endregion
+
+}

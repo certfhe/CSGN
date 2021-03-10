@@ -277,7 +277,7 @@ long SecretKey::size()
 
 #pragma endregion
 
-#pragma region Getters 
+#pragma region Getters and setters
 
 uint64_t  SecretKey::getLength() const
 {
@@ -287,6 +287,18 @@ uint64_t  SecretKey::getLength() const
 uint64_t* SecretKey::getKey() const
 {
 	return this->s;
+}
+
+void SecretKey::setKey(uint64_t*s, uint64_t len)
+{
+	if (this->s != nullptr)
+		delete [] this->s;
+	
+	this->s = new uint64_t[len];
+	for(uint64_t i=0;i<len;i++)
+		this->s[i] = s[i];
+
+	this->length = len;
 }
 
 #pragma endregion
