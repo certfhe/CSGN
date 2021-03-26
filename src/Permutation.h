@@ -85,7 +85,7 @@ namespace certFHE{
          * @param[in] permB: the second permutation to combine
          * @return value : a permutatuion with value equal to this o permB
         **/
-       Permutation operator+(const Permutation& permB);
+       Permutation operator+(const Permutation& permB) const;
        Permutation& operator+=(const Permutation& permB);
     };
 

@@ -31,7 +31,7 @@ namespace certFHE{
              * @param[out] newlen: the length of the returning vector, in bytes
              * @return value: the result of addition 
             **/
-            uint64_t* add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2, uint64_t &newlen);
+            uint64_t* add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2, uint64_t &newlen) const;
 
             /**
              * Multiply two ciphertxts with both with same dimension = defaultN
@@ -40,7 +40,7 @@ namespace certFHE{
              * @param[in] len: length of c1 and c2 vector, in blocks of 8 bytes
              * @return value : result of encrypted (c1*c2). The length will be the same as len.
             **/
-            uint64_t* defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len);
+            uint64_t* defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len) const;
 
             /**
              * Multiply two ciphertexts which are of different dimensions
@@ -55,7 +55,7 @@ namespace certFHE{
              * @param[in]  bitlenout: vector of size newlen which containts the number of bits from resulting vector
              * @return value: vector of size newlen with the encrypted output of (c1*c2)
             **/
-            uint64_t* multiply(const Context& ctx,uint64_t *c1,uint64_t*c2,uint64_t len1,uint64_t len2, uint64_t& newlen,uint64_t* bitlenin1,uint64_t* bitlenin2,uint64_t*& bitlenout);
+            uint64_t* multiply(const Context& ctx,uint64_t *c1,uint64_t*c2,uint64_t len1,uint64_t len2, uint64_t& newlen,uint64_t* bitlenin1,uint64_t* bitlenin2,uint64_t*& bitlenout) const;
 
     public:
 
@@ -109,13 +109,13 @@ namespace certFHE{
         /**
          * Operators for addition of ciphertexts
         **/
-        Ciphertext operator+(const Ciphertext& c);
+        Ciphertext operator+(const Ciphertext& c) const;
         Ciphertext& operator+=(const Ciphertext& c);
 
         /**
          * Operators for multiplication of ciphertexts
         **/
-        Ciphertext operator*(const Ciphertext& c);
+        Ciphertext operator*(const Ciphertext& c) const;
         Ciphertext& operator*=(const Ciphertext& c);
 
         /**

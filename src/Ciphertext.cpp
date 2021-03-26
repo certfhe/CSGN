@@ -104,7 +104,7 @@ long Ciphertext::size()
 
 #pragma region Private methods
 
-uint64_t* Ciphertext::add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2, uint64_t &newlen)
+uint64_t* Ciphertext::add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2, uint64_t &newlen) const
 {
     uint64_t* res = new uint64_t[len1+len2];
     newlen = len1+len2;
@@ -121,7 +121,7 @@ uint64_t* Ciphertext::add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2,
 	return res;
 }
 
-uint64_t* Ciphertext::defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len)
+uint64_t* Ciphertext::defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len) const
 {
 	uint64_t* res = new uint64_t[len];
 	for (int i = 0; i < len; i++)
@@ -130,7 +130,7 @@ uint64_t* Ciphertext::defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len
 	return res;
 }
 
-uint64_t* Ciphertext::multiply(const Context& ctx,uint64_t *c1,uint64_t*c2,uint64_t len1,uint64_t len2, uint64_t& newlen,uint64_t* bitlenin1,uint64_t* bitlenin2,uint64_t*& bitlenout)
+uint64_t* Ciphertext::multiply(const Context& ctx,uint64_t *c1,uint64_t*c2,uint64_t len1,uint64_t len2, uint64_t& newlen,uint64_t* bitlenin1,uint64_t* bitlenin2,uint64_t*& bitlenout) const
 {
  newlen=len1;
  uint64_t _defaultLen = ctx.getDefaultN();
@@ -201,7 +201,7 @@ ostream& certFHE::operator<<(ostream &out, const Ciphertext &c)
     return out;
 }
 
-Ciphertext Ciphertext::operator+(const Ciphertext& c)
+Ciphertext Ciphertext::operator+(const Ciphertext& c) const
 {
 	long newlen = this->len + c.getLen();
     uint64_t* _bitlen = new uint64_t [newlen];
@@ -228,7 +228,7 @@ Ciphertext Ciphertext::operator+(const Ciphertext& c)
     return result;
 }
 
-Ciphertext Ciphertext::operator*(const Ciphertext& c)
+Ciphertext Ciphertext::operator*(const Ciphertext& c) const
 {
     uint64_t len2 = c.getLen();
     uint64_t *valuesSecondOperand = c.getValues();

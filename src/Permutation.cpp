@@ -60,7 +60,7 @@ Permutation& Permutation::operator=(const Permutation& perm)
     return *this;
 }
 
-Permutation Permutation::operator+(const Permutation& permB)
+Permutation Permutation::operator+(const Permutation& permB) const
 {
     if ( length != permB.getLength())
         return Permutation();         
