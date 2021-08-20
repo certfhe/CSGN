@@ -1,374 +1,337 @@
 #include "SecretKey.h"
+#include "GlobalParams.h"
+#include "Ciphertext.h"
+#include "Plaintext.h"
+#include "Permutation.h"
+#include "Context.h"
+#include "CCC.h"
 
-using namespace certFHE;
-using namespace std;
+namespace certFHE{
 
 #pragma region Operators
 
-SecretKey& SecretKey::operator=(const SecretKey& secKey)
-{
-	if (this->s != nullptr)
-	{
-		delete [] this->s;
+	SecretKey & SecretKey::operator = (const SecretKey & secKey) {
+
+		if (this->s != nullptr)
+			delete [] this->s;
+		
+		if (this->s_mask != nullptr)
+			delete [] this->s_mask;
+
+		this->length = secKey.length;
+		this->s = new uint64_t[secKey.length];
+
+		for(uint64_t i = 0; i < secKey.length; i++)
+			this->s[i] = secKey.s[i];
+
+		this->set_mask_key();
+
+		return *this;
 	}
 
-	this->length = secKey.length;
-	this->s = new uint64_t [secKey.length];
-	for(uint64_t i =0 ;i<secKey.length;i++)
-		this->s[i] = secKey.s[i];
-	return *this;
-}
+	std::ostream & operator << (std::ostream & out, const SecretKey & c) {
 
-ostream& certFHE::operator<<(ostream &out, const SecretKey &c)
-  {
-	  uint64_t* key = c.getKey();
-	  for(long i =0;i<c.getLength();i++)
-	  	out<<key[i]<<" ";
-	  out<<endl;
-	  return out;
-  }
+		uint64_t * key = c.getKey();
+
+		for(uint64_t i = 0; i < c.getLength(); i++)
+			out << key[i] << " ";
+		out << '\n';
+
+		return out;
+	}
 
 #pragma endregion
 
 #pragma region Private functions
 
-uint64_t* SecretKey::encrypt(unsigned char bit, uint64_t n, uint64_t d, uint64_t*s)
-{
-     //@TODO: generate only a random of size n-d instead of n-d randoms()
-	uint64_t* res = new uint64_t[n];
-	bit = BIT(bit);
+	void SecretKey::set_mask_key() {
 
-	if (bit == 0x01)
-	{
-		for (int i = 0; i < n; i++)
-			if (Helper::exists(s, d, i))
-				res[i] = 0x01;
-			else
-				res[i] = rand() % 2;
+		uint64_t length = this->length;
+		uint64_t default_len = this->certFHEContext->getDefaultN();
+
+		uint64_t * mask = new uint64_t[default_len];
+		memset(mask, 0, sizeof(uint64_t) * default_len);
+		
+		for (uint64_t j = 0; j < length; j++) {
+
+			uint64_t u64_j = s[j] / 64;
+			uint64_t b = 63 - (s[j] % 64);
+
+			mask[u64_j] |= (uint64_t)1 << b;
+		}
+
+		this->s_mask = mask;
 	}
-	else
-	{
-		uint64_t sRandom = rand() % d;
-		uint64_t v = 0x00;
-		bool vNok = true;
 
-		for (int i = 0; i < n; i++)
-			if (i != s[sRandom])
-			{
-				res[i] = rand() % 2;
+	uint64_t * SecretKey::encrypt_raw_bit(unsigned char bit) const {
 
-				if (Helper::exists(s,d,i))
-				{
-					if (vNok)
-					{
-						v = res[i];
-						vNok = false;
+		uint64_t n = this->certFHEContext->getN();
+		uint64_t d = this->certFHEContext->getD();
+		uint64_t * s = this->s;
+
+		//@TODO: generate only a random of size n-d instead of n-d randoms()
+		uint64_t * res = new uint64_t[n];
+
+		if (bit == 0x01) {
+
+			for (uint64_t i = 0; i < n; i++)
+				if (Helper::exists(s, d, i))
+					res[i] = 0x01;
+				else
+					res[i] = rand() % 2;
+		}
+		else {
+
+			uint64_t sRandom = (uint64_t)rand() % d;
+			uint64_t v = 0x00;
+			bool vNok = true;
+
+			for (uint64_t i = 0; i < n; i++)
+
+				if (i != s[sRandom]){
+
+					res[i] = rand() % 2;
+
+					if (Helper::exists(s, d, i)) {
+
+						if (vNok) {
+
+							v = res[i];
+							vNok = false;
+						}
+						v = v & res[i];
 					}
-					v = v & res[i];
-
 				}
 
-			}
+			if (v == 0x01)
+				res[s[sRandom]] = 0;
+			else
+				res[s[sRandom]] = rand() % 2;
 
-		if (v == 0x01)
-		res[s[sRandom]] = 0;
-		else
-		res[s[sRandom]] = rand() %2;
-
+		}
+		return res;
 	}
-	return res;
-}
-
-uint64_t SecretKey::defaultN_decrypt(uint64_t* v,uint64_t len, uint64_t n, uint64_t d, uint64_t* s,uint64_t* bitlen)
-{
-  int totalLen = 0;
-	for (int i = 0;  i < len; i++)
-		totalLen = totalLen + bitlen[i];
-	uint8_t *values = new uint8_t [totalLen];
-	int index = 0;
-	for (int i = 0;  i < len; i++)
-		for (int k = 0;  k < bitlen[i]; k++)
-		{
-			int shifts = sizeof(uint64_t)*8-1 -k ;
-			values[index] =  ( v[i] >> shifts) & 0x01;
-			index++;
-		}
-
-    uint64_t dec = values[s[0]];
-	for (int i = 1;  i <d; i++)
-		dec = dec && values[s[i]];
-	delete [] values;
-	return dec;   
-}
-
-uint64_t SecretKey::decrypt(uint64_t* v,uint64_t len,uint64_t defLen, uint64_t n, uint64_t d, uint64_t* s,uint64_t* bitlen)
-{
-      if (len == defLen)
-        return defaultN_decrypt(v,len,n,d,s,bitlen);
-
-
-	int totalLen = 0;
-	for (int i = 0;  i < len; i++)
-		totalLen = totalLen + bitlen[i];
-	uint8_t *values = new uint8_t [totalLen];
-
-	int index = 0;
-	for (int i = 0;  i < len; i++)
-		for (int k = 0;  k < bitlen[i]; k++)
-		{
-			int shifts = sizeof(uint64_t)*8-1 -k ;
-			values[index] =  ( v[i] >> shifts) & 0x01;
-		
-			index++;
-		
-		}
-
-    uint64_t times = len/defLen;
-
-    uint64_t dec = values[s[0]];
-	uint64_t _dec = 0;
-
-    for (int k=0;k<times;k++)
-    {
-        dec =  values[n*k+s[0]];
-        for (int i = 1;  i < d; i++)
-	    {
-            dec = dec & values[n*k+s[i]];
-        }
-		
-        _dec = (dec+_dec)%2;
-    }
-
-    dec =_dec;
-
-	delete [] values;
-
-	return dec;
-}
 
 #pragma endregion
 
 #pragma region Public methods
 
-Ciphertext SecretKey::encrypt(Plaintext &plaintext)
-{
-    uint64_t len;
+	Ciphertext SecretKey::encrypt(const Plaintext & plaintext) const {
 
-	uint64_t n = this->certFHEContext->getN();
-	uint64_t d = this->certFHEContext->getD();
+		return Ciphertext(plaintext, *this); 
+	}
 
-	uint64_t div = n / (sizeof(uint64_t)*8);
-	uint64_t rem = n % (sizeof(uint64_t)*8);
-    len = div;
-	if ( rem != 0)
-		len++;	
+	Plaintext SecretKey::decrypt(const Ciphertext & ciphertext) const {
 
-    unsigned char value = BIT(plaintext.getValue());
-    uint64_t * vect =  encrypt(value,n,d,s);
-	uint64_t * _bitlen = new uint64_t [len];
-    uint64_t * _encValues = new uint64_t [len];
+		return ciphertext.decrypt(*this); 
+	}
 
-	for (int i = 0;i<div;i++)
-		_bitlen[i] = sizeof(uint64_t)*8;
-	_bitlen[div] = rem;
+	uint64_t * SecretKey::encrypt_raw(const Plaintext & plaintext) const {
 
-	int uint64index = 0;
-	for (int step =0;step<div;step++)
-	{
-		    _encValues[uint64index]= 0x00;
-			for (int s = 0;s< 64;s++)
-			{
-				uint64_t inter = ((vect[step*64+s]  ) & 0x01)<<sizeof(uint64_t)*8 - 1 -s;
-				_encValues[uint64index] = (_encValues[uint64index] ) | ( inter );
+		uint64_t n = this->certFHEContext->getN();
+		uint64_t d = this->certFHEContext->getD();
+
+		uint64_t div = n / (sizeof(uint64_t) * 8);
+		uint64_t rem = n % (sizeof(uint64_t) * 8);
+		uint64_t len = div;
+		if (rem != 0)
+			len++;
+
+		unsigned char value = plaintext.getValue();
+		uint64_t * vect = this->encrypt_raw_bit(value);
+
+		uint64_t * _encValues = new uint64_t[len];
+
+		uint64_t uint64index = 0;
+		for (uint64_t step = 0; step < div; step++) {
+
+			_encValues[uint64index] = 0x00;
+			for (uint64_t s = 0; s < 64; s++) {
+
+				uint64_t inter = (vect[step * 64 + s] & 0x01) << (sizeof(uint64_t) * 8 - 1 - s);
+				_encValues[uint64index] = _encValues[uint64index] | inter;
 			}
 			uint64index++;
-	}
-	
-	if (rem != 0)
-	{		
-			_encValues[uint64index]= 0x00;
-			for (int r = 0 ;r<rem;r++)
-			{
-				uint64_t inter = ((vect[ div*64 +r ]  ) & 0x01)<<sizeof(uint64_t)*8 - 1-r;
-				_encValues[uint64index] = (_encValues[uint64index] ) | ( inter );
+		}
+
+		if (rem != 0) {
+
+			_encValues[uint64index] = 0x00;
+			for (uint64_t r = 0; r < rem; r++) {
+
+				uint64_t inter = (vect[div * 64 + r] & 0x01) << (sizeof(uint64_t) * 8 - 1 - r);
+				_encValues[uint64index] = _encValues[uint64index] | inter;
 
 			}
+		}
 
-	}
-	
-    Ciphertext c(_encValues,_bitlen,len,*this->certFHEContext);
-    delete [] vect;
-    delete [] _bitlen;    
-    delete [] _encValues;
+		delete[] vect;
 
-    return c;
-
-}
-
-Plaintext SecretKey::decrypt(Ciphertext& ciphertext)
-{   
-    uint64_t n = this->certFHEContext->getN();
-	uint64_t d = this->certFHEContext->getD();
-
-	uint64_t div = n/ (sizeof(uint64_t)*8);
-	uint64_t rem = n % (sizeof(uint64_t)*8);
-    uint64_t defLen = div;
-	if ( rem != 0)
-		defLen++;	
-
-    uint64_t* _v = ciphertext.getValues();
-    uint64_t* _bitlen = ciphertext.getBitlen();
-
-    uint64_t decV =  decrypt(_v,ciphertext.getLen(),defLen,n,d,s,_bitlen);
-    return Plaintext(decV);
-}
-
-void SecretKey::applyPermutation_inplace(const Permutation& permutation)
-{
-	uint64_t permLen = permutation.getLength();
-	uint64_t *perm = permutation.getPermutation();
-
-	uint64_t *current_key = new uint64_t[this->certFHEContext->getN()];
-	
-	for(uint64_t i = 0;i<this->certFHEContext->getN();i++)
-		current_key[i] = 0;
-
-	for(uint64_t i = 0;i<length;i++)
-		current_key[s[i]] =1;
-
-	uint64_t *temp = new uint64_t[this->certFHEContext->getN()];
-
-	for (int i = 0; i < this->certFHEContext->getN(); i++)
-		temp[i] = current_key[perm[i]];
-
-	uint64_t *newKey = new uint64_t[length];
-	uint64_t index = 0; 
-	for(uint64_t i =0;i<this->certFHEContext->getN();i++)
-	{
-		if (temp[i] == 1)
-			newKey[index++] = i;
+		return _encValues;
 	}
 
-	delete [] this->s;
-	this->s = newKey;
+	uint64_t * SecretKey::encrypt_raw(const void * addr) const {
 
+		uint64_t n = this->certFHEContext->getN();
+		uint64_t d = this->certFHEContext->getD();
 
-	delete [] current_key;
-	delete [] temp;
+		uint64_t div = n / (sizeof(uint64_t) * 8);
+		uint64_t rem = n % (sizeof(uint64_t) * 8);
+		uint64_t len = div;
+		if (rem != 0)
+			len++;
 
-}
+		unsigned char value = (*(unsigned char *)addr) & 0x01;
+		uint64_t * vect = this->encrypt_raw_bit(value);
 
-SecretKey SecretKey::applyPermutation(const Permutation& permutation)
-{
+		uint64_t * _encValues = new uint64_t[len];
 
-	SecretKey secKey(*this);
-	secKey.applyPermutation_inplace(permutation);
-	return secKey;
-}
+		uint64_t uint64index = 0;
+		for (uint64_t step = 0; step < div; step++) {
 
-long SecretKey::size()
-{
-	long size = 0;
-	size += sizeof(this->certFHEContext);
-	size += sizeof(this->length);
-	size += sizeof(uint64_t)*this->length;
-	return size;
-}
+			_encValues[uint64index] = 0x00;
+			for (uint64_t s = 0; s < 64; s++) {
 
-#pragma endregion
+				uint64_t inter = (vect[step * 64 + s] & 0x01) << (sizeof(uint64_t) * 8 - 1 - s);
+				_encValues[uint64index] = _encValues[uint64index] | inter;
+			}
+			uint64index++;
+		}
 
-#pragma region Getters and setters
+		if (rem != 0) {
 
-uint64_t  SecretKey::getLength() const
-{
-	return this->length;
-}
+			_encValues[uint64index] = 0x00;
+			for (uint64_t r = 0; r < rem; r++) {
 
-uint64_t* SecretKey::getKey() const
-{
-	return this->s;
-}
+				uint64_t inter = (vect[div * 64 + r] & 0x01) << (sizeof(uint64_t) * 8 - 1 - r);
+				_encValues[uint64index] = _encValues[uint64index] | inter;
+			}
+		}
 
-void SecretKey::setKey(uint64_t*s, uint64_t len)
-{
-	if (this->s != nullptr)
+		delete[] vect;
+
+		return _encValues;
+	}
+
+	void SecretKey::applyPermutation_inplace(const Permutation & permutation){
+
+		uint64_t * perm = permutation.getPermutation();
+
+		uint64_t * current_key = new uint64_t[this->certFHEContext->getN()];
+		
+		for(uint64_t i = 0; i < this->certFHEContext->getN(); i++)
+			current_key[i] = 0;
+
+		for(uint64_t i = 0; i < length; i++)
+			current_key[s[i]] = 1;
+
+		uint64_t * temp = new uint64_t[this->certFHEContext->getN()];
+
+		for (uint64_t i = 0; i < this->certFHEContext->getN(); i++)
+			temp[i] = current_key[perm[i]];
+
+		uint64_t * newKey = new uint64_t[length];
+		uint64_t index = 0; 
+		for(uint64_t i = 0; i < this->certFHEContext->getN(); i++) {
+
+			if (temp[i] == 1)
+				newKey[index++] = i;
+		}
+
 		delete [] this->s;
-	
-	this->s = new uint64_t[len];
-	for(uint64_t i=0;i<len;i++)
-		this->s[i] = s[i];
+		this->s = newKey;
 
-	this->length = len;
-}
+		delete [] this->s_mask;
+		this->set_mask_key();
+
+		delete [] current_key;
+		delete [] temp;
+	}
+
+	SecretKey SecretKey::applyPermutation(const Permutation & permutation) {
+
+		SecretKey secKey(*this);
+		secKey.applyPermutation_inplace(permutation);
+		return secKey;
+	}
 
 #pragma endregion
 
 #pragma region Constructors and destructor
 
-SecretKey::SecretKey(const Context &context)
-{
-    // seed once again the PRNG with local time
-    time_t t = time(NULL);
-	srand(t);
+	SecretKey::SecretKey(const Context & context) {	
 
-    this->certFHEContext = new certFHE::Context(context);
+		// seed once again the PRNG with local time
+		srand((unsigned int)time(0));
 
-    uint64_t _d = certFHEContext->getD();
-    uint64_t _n = certFHEContext->getN();
+		this->certFHEContext = new Context(context);
 
-    this->s =  new uint64_t[_d];
-    this->length = _d;
+		uint64_t _d = certFHEContext->getD();
+		uint64_t _n = certFHEContext->getN();
 
-	int count = 0;
-	bool go = true;
-	while (go)
-	{
+		this->s =  new uint64_t[_d];
+		this->length = _d;
 
-		uint64_t temp = rand() % _n;
-		if (Helper::exists(s,_d, temp))
-			continue;
+		uint64_t count = 0;
+		bool go = true;
+		while (go) {
 
-		s[count] = temp;
-		count++;
-		if (count == _d)
-			go = false;
+			uint64_t temp = rand() % _n;
+			if (Helper::exists(s,_d, temp))
+				continue;
+
+			s[count] = temp;
+			count++;
+			if (count == _d)
+				go = false;
+		}
+		
+		this->set_mask_key();
 	}
-    
-}
 
-SecretKey::SecretKey(const SecretKey& secKey) 
-{
-    this->certFHEContext = new certFHE::Context(*secKey.certFHEContext);
+	SecretKey::SecretKey(const SecretKey & secKey) {
 
-     if ( secKey.length < 0)
-        return;
-    
-    this->s = new uint64_t [ secKey.length];
-    this->length =  secKey.length;
-    for(long i = 0;i< secKey.length;i++)
-        this->s[i ] =secKey.s[i];
+		this->certFHEContext = new Context(*secKey.certFHEContext);
 
-    
-}
+		this->s = new uint64_t [secKey.length];
+		this->length = secKey.length;
 
-SecretKey::~SecretKey()
-{
-	for (uint64_t i = 0; i < length; i++)
-		s[i] = 0;
+		for(uint64_t i = 0; i < secKey.length; i++)
+			this->s[i] = secKey.s[i];
+		
+		this->set_mask_key();
+	}
 
-    if (this->s != nullptr)
-    {
-        delete [] this->s;
-        this->s = nullptr;
-    }
-    
-    this->length =-1;
+	SecretKey::~SecretKey() { 	
 
-    if (this->certFHEContext != nullptr)
-    {
-        delete this->certFHEContext;
-        this->certFHEContext = nullptr;
-    }
-}
+		for (uint64_t i = 0; i < length; i++)
+			s[i] = 0;
+
+		uint64_t default_len = this->certFHEContext->getDefaultN();
+		for (uint64_t i = 0; i < default_len; i++)
+			s_mask[i] = 0;
+
+		if (this->s != nullptr) {
+
+			delete [] this->s;
+			this->s = nullptr;
+		}
+
+		if (this->s_mask != nullptr) {
+
+			delete[] this->s_mask;
+			this->s_mask = nullptr;
+		}
+		
+		this->length = -1;
+
+		if (this->certFHEContext != nullptr) {
+
+			delete this->certFHEContext;
+			this->certFHEContext = nullptr;
+		}
+	}
 
 #pragma endregion
+
+}

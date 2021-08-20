@@ -2,153 +2,130 @@
 #define SECRET_KEY_H
 
 #include "utils.h"
-#include "Context.h"
-#include "Plaintext.h"
-#include "Ciphertext.h"
 #include "Helpers.h"
-#include "Permutation.h"
 
-using namespace std;
+namespace certFHE {
 
-namespace certFHE
-{
+	class Ciphertext;
+	class Plaintext;
+	class Permutation;
+	class Context;
+
     /**
      * Class used for storing the secret key and to perform operations such as encrypt/decrypt
     **/
     class SecretKey{
 
-    private:
+        uint64_t * s;                    // secret positions from the vector [0,n-1]. 
+		uint64_t * s_mask;				 // secret key as a bitmask
 
-        uint64_t *s;                    // secret positions from the vector [0,n-1]. 
-        long length;                    // length of the s vector, containing the secret posionts
+        uint64_t length;                 // length of the s vector, containing the secret posionts
+		uint64_t mask_length;		     // length of secret key as bitmask IN UINT64 CHUNKS
 
-        Context *certFHEContext;
+        Context * certFHEContext;
 
-        /**
-         * Encrypts a bit 
-         * @param[in] bit: input from F2 space
-         * @param[in] n: N value from Context
-         * @param[in] d: D value from Context
-         * @param[in] s: the secret key 
-         * @return value : encryption of input bit
-        **/
-        uint64_t* encrypt(unsigned char bit, uint64_t n, uint64_t d, uint64_t*s);
+		/**
+		 * Useful for decryption optimization
+		 * Sets key mask according to the already existing s
+		 * @return value : nothing
+		**/
+		void set_mask_key();
 
-        /**
-         * Decryption function when the size of ciphertext is equal to context.N
-         * @param[in] v: vector of size n bits
-         * @param[in] len: size of vector v in bytes
-         * @param[in] n: n value from context
-         * @param[in] d: d value from context
-         * @param[in] s: secret key s
-         * @param[in] bitlen: length in bits of each v[i]
-         * @return value: decrypted bit (F2 space)
-        **/
-        uint64_t defaultN_decrypt(uint64_t* v,uint64_t len, uint64_t n, uint64_t d, uint64_t* s,uint64_t* bitlen);
-
-        /**
-         * Decrypts an encrypted value 
-         * @param[in] v: vector of bits, size in multiple of n
-         * @param[in] len: size of vector v in bytes
-         * @param[in] defLen: default length of N
-         * @param[in] n: n value from context
-         * @param[in] d: d value from context
-         * @param[in] s: secret key s
-         * @param[in] bitlen: length in bits of each v[i]
-         * @return value: decrypted bit (F2 space)
-        **/
-        uint64_t decrypt(uint64_t* v,uint64_t len,uint64_t defLen, uint64_t n, uint64_t d, uint64_t* s,uint64_t* bitlen);
+		/**
+		 * Encrypts the first bit from a memory address
+		 * @param[in] addr: the memory address
+		 * @return value: raw ciphertext chunk
+		**/
+		uint64_t * encrypt_raw_bit(unsigned char bit) const;
 
     public:
 
-        /**
-         * Deleted default constructor
-        **/
         SecretKey() = delete;
 
         /**
          * Custom constructor. Generates a secret key based on the context.
          * @param[in] context: a const. reference to an context
         **/
-        SecretKey(const Context &context);
+        SecretKey(const Context & context);
 
-        /**
-         * Copy constructor
-         * @param[in] secKey: SecretKey object 
-        **/
-        SecretKey(const SecretKey& secKey);
+        SecretKey(const SecretKey & secKey);
 
         /**
          * Encrypts a plaintext
          * @param[in] plaintext: input to be encrypted ({0,1})
-         * @return value: resultint ciphertext
+         * @return value: raw ciphertext chunk
         **/
-        Ciphertext encrypt( Plaintext &plaintext);
+		uint64_t * encrypt_raw(const Plaintext & plaintext) const;
+
+		/**
+		 * Encrypts the first bit from a memory address
+		 * @param[in] addr: the memory address
+		 * @return value: raw ciphertext chunk
+		**/
+		uint64_t * encrypt_raw(const void * addr) const;
+
+		/**
+		 * Encrypts a plaintext
+		 * @param[in] plaintext: input to be encrypted ({0,1})
+		 * @return value: Ciphertext object
+		**/
+		Ciphertext encrypt(const Plaintext & plaintext) const;
 
         /**
-         * Decrypts an ciphertxts
+         * Decrypts a ciphertext
          * @param[in] ciphertext: ciphertext to be decrypted 
          * @return value: decrypted plaintext
         **/
-        Plaintext decrypt( Ciphertext& ciphertext);
+		Plaintext decrypt(const Ciphertext & ciphertext) const; 
 
         /**
          * Apply the permutation on current secret key
          * @param[in] permutation: Permutation object
         **/
-        void applyPermutation_inplace(const Permutation& permutation);
+        void applyPermutation_inplace(const Permutation & permutation);
 
         /**
          * Apply a permutation on the current secret key and return a new object
          * @param[in] permutation: permutation object to be applied
          * @return value: a permuted secret key object
         **/
-        SecretKey applyPermutation(const Permutation& permutation);
+        SecretKey applyPermutation(const Permutation & permutation);
 
         /**
-         * Friend class for operator<<
+         * Friend class for operator <<
         **/
-        friend ostream& operator<<(ostream &out, const SecretKey &c);
+        friend std::ostream & operator << (std::ostream & out, const SecretKey & c);
 
         /**
          * Assignment operator
          * @param[in] secKey: a constant copy of an secret key object
         **/
-        SecretKey& operator= (const SecretKey& secKey);
+        SecretKey & operator = (const SecretKey & secKey);
 
-        /**
-         * Destructor
-        **/
         virtual ~SecretKey();
 
         /**
-         * Getters
+         * @return value: number of elements in the secret key (s vector length)
         **/
-        uint64_t getLength() const;
+		uint64_t getLength() const { return this->length; }
+
+		/**
+		* DO NOT DELETE THIS POINTER
+	   **/
+		Context * getContext() const { return this->certFHEContext; }
 
         /**
          * DO NOT DELETE THIS POINTER
         **/
-        uint64_t* getKey() const;
-		
+		uint64_t * getKey() const { return this->s; }
+
 		/**
-		 * Setters
+		 * DO NOT DELETE THIS POINTER
 		**/
-		void setKey(uint64_t*s, uint64_t len);
-		
-        /**
-         * Get the size in bytes of the secret key
-         * @return value: size in bytes
-        **/
-        long size();
+		uint64_t * getMaskKey() const { return this->s_mask; }
 
     };
 
-
 }
-
-
-
-
 
 #endif

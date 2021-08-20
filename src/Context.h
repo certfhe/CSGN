@@ -4,8 +4,6 @@
 #include "utils.h"
 #include "Helpers.h"
 
-using namespace std;
-
 namespace certFHE{
 
     /**
@@ -37,39 +35,49 @@ namespace certFHE{
          * @param[in] N: Dimension parameter n(lambda)
          * @param[in] D: Number of secret positions
         **/
-        Context(const uint64_t pN,const uint64_t pD);
+        Context(const uint64_t pN, const uint64_t pD);
 
         /**
          * Destructor
         **/
-        virtual ~Context();
+		virtual ~Context() {}
 
         /**
-         * Equal operator
-         * @param[in] context: a const. ref. to a Context object
+         * Assignment operator
+         * @param[in] context: a const reference to a Context object
          * @return value : a deep copy of the context parameter
         **/
-        Context& operator=(const Context& context);
+        Context & operator = (const Context & context);
 
-        /**
-         * Friend class for operator<<
-        **/
-        friend ostream& operator<<(ostream &out, const Context &c);
+		bool operator == (const Context & other) const {
 
+			return this->N == other.N && this->D == other.D
+				&& this->S == other.S && this->defaultLen == other.defaultLen;
+		}
+
+		bool operator != (const Context & other) const { return !(*this == other); }
+
+        friend std::ostream & operator << (std::ostream & out, const Context & c);
 
         /**
          * Getters and setters
         **/
-        uint64_t getN() const;
-        uint64_t getD() const;
-        uint64_t getS() const;
-        uint64_t getDefaultN() const;
+		uint64_t getN() const { return this->N; }
+		uint64_t getD() const { return this->D; }
+		uint64_t getS() const { return this->S; }
+		uint64_t getDefaultN() const { return this->defaultLen; }
 
-        void setN(uint64_t n);
-        void setD(uint64_t d);        
+        void setN(uint64_t n) {
 
+			this->N = n;
+			this->S = n / (2 * this->D);
+		}
 
+		void setD(uint64_t d) {
 
+			this->D = d;
+			this->S = this->N / (2 * this->D);
+		}
 
     };
 
