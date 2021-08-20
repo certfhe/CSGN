@@ -52,18 +52,18 @@ Ciphertext c1 = seckey.encrypt(p1);
 Ciphertext c0 = seckey.encrypt(p0);
 
 // multiply two ciphertexts 
-c1 = c1*c2;
+c1 = c1 * c2;
 c1 *= c2;
 
 // add a ciphertexts
-c1 = c1+c2;
+c1 = c1 + c2;
 c1 += c2;
 
 // decrypt the result
 Plaintext result = seckey.decrypt(c1);
 
 //print the results 
-std::cout<<result;
+std::cout << result;
 ```
 
 # License

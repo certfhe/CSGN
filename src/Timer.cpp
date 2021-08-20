@@ -1,50 +1,58 @@
 #include "Timer.h"
 
-using namespace certFHE;
-using namespace std;
+namespace certFHE{
 
 #pragma region Constructors and destructor
 
-Timer::Timer(string pname) : name(pname)
-{
-    this->chronometer = std::chrono::duration<double>(0);
-}
+    Timer::Timer(std::string pname) : name(pname) {
 
-Timer::~Timer() {
+        this->chronometer = std::chrono::duration <double>(0);
+    }
 
-}
+    Timer::~Timer() {}
 
 #pragma endregion
 
 #pragma region Public methods
 
-void Timer::start(){
-    this->start_fingerprint = std::chrono::high_resolution_clock::now();
-}
+    void Timer::start() {
 
-double Timer::stop(){
-    this->stop_fingerprint = std::chrono::high_resolution_clock::now();
-    chronometer = stop_fingerprint - start_fingerprint;
-    return chronometer.count()*1000;
-}
+        this->start_fingerprint = std::chrono::high_resolution_clock::now();
+    }
 
-void Timer::print(){
-    cout<<this->name<<" : "<<chronometer.count()*1000<< " ms "<<endl;fflush(stdout);
-}
+    double Timer::stop() {
 
-void Timer::reset(){
-    this->stop_fingerprint = std::chrono::high_resolution_clock::now();
-    this->start_fingerprint = stop_fingerprint;
-}
+		this->stop_fingerprint = std::chrono::high_resolution_clock::now();
+        chronometer = stop_fingerprint - start_fingerprint;
 
-double Timer::stopAndPrint(){
-    this->stop();
-    this->print();
-    return chronometer.count()*1000;
-}
+        return chronometer.count() * 1000;
+    }
 
-double Timer::getValue(){
-    return chronometer.count()*1000;
-}
+    void Timer::print() {
+
+        std::cout << this->name << " : " << chronometer.count() * 1000 << " ms " << '\n';
+		fflush(stdout);
+    }
+
+    void Timer::reset() {
+
+        this->stop_fingerprint = std::chrono::high_resolution_clock::now();
+        this->start_fingerprint = stop_fingerprint;
+    }
+
+    double Timer::stopAndPrint() {
+
+        this->stop();
+        this->print();
+
+        return chronometer.count() * 1000;
+    }
+
+    double Timer::getValue() {
+
+        return chronometer.count() * 1000;
+    }
 
 #pragma endregion
+
+}

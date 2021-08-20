@@ -3,8 +3,6 @@
 
 #include "utils.h"
 
-using namespace std;
-
 namespace certFHE{
 
     /**
@@ -12,44 +10,28 @@ namespace certFHE{
     **/
     class Plaintext{
 
-    private:
-
         unsigned char value;
 
     public:
 
-        /**
-         * Default constructor
-        **/
-        Plaintext();
+		Plaintext() : value(0) {}
 
-        /**
-         * Custom constructor
-        **/
-        Plaintext(const int value);
+		Plaintext(uint64_t value) : value(BIT(value)) {}
 
-        /**
-         * Destructor
-        **/
-        virtual ~Plaintext();
+		virtual ~Plaintext() {}
 
         /**
          * Getter and setter
         **/
-        unsigned char getValue() const;
-        void setValue(unsigned char value);
+		unsigned char getValue() const { return this->value; }
+		void setValue(unsigned char value) { this->value = BIT(value); }
 
         /**
-         * Friend class for operator<<
+         * Friend class for operator <<
         **/
-        friend ostream& operator<<(ostream &out, const Plaintext &c);
+        friend std::ostream & operator << (std::ostream & out, const Plaintext & c);
         
     };
-
-
-
-
-
 
 }
 

@@ -5,8 +5,6 @@
 #include "Helpers.h"
 #include "Context.h"
 
-using namespace std;
-
 namespace certFHE{
 
     /**
@@ -14,64 +12,61 @@ namespace certFHE{
     **/
     class Permutation{
 
-    private:
+        uint64_t * permutation;			// vector used to store permutation
+		PermInversion * inversions;		// permutation as inversions on a default len chunk -- for optimized permutation op --
+        
+		uint64_t length;				// size of permutation vector
+		uint64_t inversions_cnt;		// number of inversions
 
-        uint64_t* permutation;     // vector used to store permutation
-        uint64_t  length;          // size of permutation vector
+		Permutation(const uint64_t * perm, const uint64_t len, uint64_t inv_cnt, const PermInversion * invs);
 
     public:
 
-        /**
-         * Default constructor
-        **/
         Permutation();
-
-        /**
-         * Custom constructor with 0 initialization
-        **/
-        Permutation(const uint64_t *perm, const uint64_t len);
 
         /**
          * Custom constructor - generates a random permutation using the N from context
         **/
-        Permutation(const Context& context);
+        Permutation(const Context & context) : Permutation(context.getN()) {}
 
         /**
          * Custom constructor - generates a random permutation of size len
         **/
-        Permutation(const uint64_t len);
+        Permutation(uint64_t len);
+
+        Permutation(const Permutation & perm);
+
+		~Permutation();
+
+		/**
+		 * Getters and setters
+		**/
+		uint64_t getLength() const { return this->length; }
+		uint64_t getInversionsCnt() const { return this->inversions_cnt; }
+
+		void setLength(uint64_t len) { this->length = len; }
+		void setInversionsCnt(uint64_t inv_cnt) { this->inversions_cnt = inversions_cnt; }
+		void setPermutation(const uint64_t * perm, uint64_t len, uint64_t inv_cnt, const PermInversion * invs);
+
+		/**
+		 * DO NOT DELETE THE RETUNING POINTER
+		**/
+		uint64_t * getPermutation() const { return this->permutation; }
+
+		/**
+		 * DO NOT DELETE THE RETUNING POINTER
+		**/
+		PermInversion * getInversions() const { return this->inversions; }
 
         /**
-         * Copy constructor
+         * Friend class for operator <<
         **/
-        Permutation(const Permutation& perm);
-
-        /**
-         * Destructor
-        **/
-       virtual ~Permutation();
-
-       /**
-        * Getters and setters
-       **/
-       uint64_t getLength() const;
-       void setLength(uint64_t len);
-       void setPermutation(uint64_t* perm,uint64_t len);
-
-       /**
-        * DO NOT DELETE THE RETUNING POINTER
-        **/
-        uint64_t* getPermutation() const; 
-
-        /**
-         * Friend class for operator<<
-        **/
-        friend ostream& operator<<(ostream &out, const Permutation &c);
+        friend std::ostream & operator << (std::ostream & out, const Permutation & c);
 
         /**
          * Asignment operator
         **/
-        Permutation& operator=(const Permutation& perm);
+        Permutation & operator = (const Permutation & perm);
 
         /**
          * Method to return the inverse of current permutation
@@ -85,8 +80,8 @@ namespace certFHE{
          * @param[in] permB: the second permutation to combine
          * @return value : a permutatuion with value equal to this o permB
         **/
-       Permutation operator+(const Permutation& permB) const;
-       Permutation& operator+=(const Permutation& permB);
+       Permutation operator + (const Permutation & other) const;
+       Permutation & operator += (const Permutation & other);
     };
 
 

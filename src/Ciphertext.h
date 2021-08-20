@@ -2,148 +2,146 @@
 #define CIPHERTEXT_H
 
 #include "utils.h"
-#include "Context.h"
-#include "Permutation.h"
-
-using namespace std;
 
 namespace certFHE{
+
+	class CNODE;
+	class Permutation;
+	class SecretKey;
+	class Context;
+	class Plaintext;
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+	class CNODE_disjoint_set;
+
+#endif
 
     /**
      * Class used for storing a ciphertext
     **/
-    class Ciphertext{
+	class Ciphertext{
 
-    private:
+	public:
     
-            uint64_t * v;           // the N bits corespoding to the encryption of plaintext (from F2 space)
-            uint64_t len;           // lenght of v & bitlen
-            uint64_t * bitlen;      // number of bits from each v[i]
+		/**
+		 * CNODE associated with the ciphertext
+		 * It can be of any type (CCC, CMUL, CADD) or null
+		**/
+		CNODE * node;
 
-            Context *certFHEcontext; // context in which was encrypted
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
 
-            /**
-             * Method for adding two ciphertexts
-             * @param[in] c1: values from first ciphertext (n bits from encryption representation)
-             * @param[in] c2: values from second ciphertext (n bits from encryption representation)
-             * @param[in] len1: length of c1 in blocks of 8 bytes
-             * @param[in] len2: length of c2 in blocks of 8 bytes
-             * @param[out] newlen: the length of the returning vector, in bytes
-             * @return value: the result of addition 
-            **/
-            uint64_t* add(uint64_t* c1,uint64_t* c2,uint64_t len1,uint64_t len2, uint64_t &newlen) const;
+		/**
+		 * Used to get a common mutex for all ciphertexts 
+		 * that (might) share a common internal CNODE
+		**/
+		CNODE_disjoint_set * concurrency_guard;
 
-            /**
-             * Multiply two ciphertxts with both with same dimension = defaultN
-             * @param[in] c1: input values for first ciphertext
-             * @param[in] c2: input values for second ciphertext
-             * @param[in] len: length of c1 and c2 vector, in blocks of 8 bytes
-             * @return value : result of encrypted (c1*c2). The length will be the same as len.
-            **/
-            uint64_t* defaultN_multiply(uint64_t* c1, uint64_t* c2, uint64_t len) const;
+#endif
 
-            /**
-             * Multiply two ciphertexts which are of different dimensions
-             * @param[in] ctx: certFHE context in which left operand was encrypted
-             * @param[in] c1: values of first operand  
-             * @param[in] c2: values of second operand
-             * @param[in] len1: length of c1 vector, in blocks of 8 bytes
-             * @param[in] len2: length of c2 vector, in blocks of 8 bytes 
-             * @param[out] newlen: length of resulting vecotr, in blocks of 8 bytes 
-             * @param[in]  bitlenin1: vector of size len1 which contains the number of bits from c1[i]
-             * @param[in]  bitlenin2: vector of size len2 which contains the number of bits from c2[i]
-             * @param[in]  bitlenout: vector of size newlen which containts the number of bits from resulting vector
-             * @return value: vector of size newlen with the encrypted output of (c1*c2)
-            **/
-            uint64_t* multiply(const Context& ctx,uint64_t *c1,uint64_t*c2,uint64_t len1,uint64_t len2, uint64_t& newlen,uint64_t* bitlenin1,uint64_t* bitlenin2,uint64_t*& bitlenout) const;
+		/**
+			* Method for adding two ciphertexts
+			* @param[in] fst: node corresponding to the first ciphertext
+			* @param[in] snd: node corresponding to the second ciphertext
+			* @return value: the result CNODE as a pointer
+		**/
+		static CNODE * add(CNODE * fst, CNODE * snd);
 
-    public:
+		/**
+			* Method for multiplying two ciphertexts
+			* @param[in] fst: node corresponding to the first ciphertext
+			* @param[in] snd: node corresponding to the second ciphertext
+			* @return value: the result CNODE as a pointer
+		**/
+		static CNODE * multiply(CNODE * fst, CNODE * snd);
 
-        /**
-         * Default constructor
-        **/
-        Ciphertext();
+	public:
 
-        /**
-         * Customer constructor
-        **/
-        Ciphertext(const uint64_t* V,const uint64_t * Bitlen,const uint64_t len, const Context& context);
+		Ciphertext();
 
-        /**
-         * Copy constructor
-        **/
-        Ciphertext(const Ciphertext& ctxt);
+		/**
+			* Custom constructor
+			* @param[in] plaintext: plaintext to be encrypted 
+			* @param[in] sk: secret key under which the encryption takes place
+		**/
+		Ciphertext(const Plaintext & plaintext, const SecretKey & sk);
 
-        /**
-         * Destructor
-        **/
-        virtual ~Ciphertext();
+		/**
+			* Custom constructor
+			* @param[in] plaintext: plaintext to be encrypted (first bit starting from any memory address)
+			* @param[in] sk: secret key under which the encryption takes place
+		**/
+		Ciphertext(const void * plaintext, const SecretKey & sk);
 
-        /**
-         * Getters and setters
-        **/
-        void setValues(const uint64_t * V,const uint64_t length);
-        void setBitlen(const uint64_t * Bitlen,const uint64_t length);
-        void setContext(const Context& context);
-        uint64_t getLen() const;
-        Context getContext() const;
+		Ciphertext(const Ciphertext & ctxt);
 
+		Ciphertext(Ciphertext && ctxt);
+
+		virtual ~Ciphertext();
+
+		/**
+			* @return value: (estimated) ciphertext number of default length chunks, 
+			*				if the ciphertext were stored (real number of ciphertext chunks might be smaller
+			*												due to lazy operations and copy-on-write)
+			*							
+		**/
+		uint64_t getLen() const;
+
+		Context getContext() const;
         
-        /**
-         * Getter for v. 
-         * @return value: v pointer stored in class. DO NOT DELETE THIS POINTER.
-        **/
-        uint64_t* getValues() const;
-
-           /**
-         * Getter for bitlen. 
-         * @return value: bitlen pointer stored in class. DO NOT DELETE THIS POINTER.
-        **/    
-        uint64_t* getBitlen() const;
-
-        /**
-         * Friend class for operator<<
-        **/
-        friend ostream& operator<<(ostream &out, const Ciphertext &c);
+		friend std::ostream & operator << (std::ostream & out, const Ciphertext & c);
         
-        /**
-         * Operators for addition of ciphertexts
-        **/
-        Ciphertext operator+(const Ciphertext& c) const;
-        Ciphertext& operator+=(const Ciphertext& c);
+		Ciphertext operator + (const Ciphertext & c) const;
 
-        /**
-         * Operators for multiplication of ciphertexts
-        **/
-        Ciphertext operator*(const Ciphertext& c) const;
-        Ciphertext& operator*=(const Ciphertext& c);
+		Ciphertext & operator += (const Ciphertext & c);
 
-        /**
-         * Operator for assignment
-        **/
-        Ciphertext& operator=(const Ciphertext& c);
+		Ciphertext operator * (const Ciphertext & c) const;
 
-        /**
-         * Apply a permutation on the current ciphertxt
-         * @param[in] permutation : permutation object to be applied
-        **/
-        void applyPermutation_inplace(const Permutation &permutation);
+		Ciphertext & operator *= (const Ciphertext & c);
 
-        /**
-         * Permute the current ciphertext and return a new object
-         * @param[in] permutation: constant reference to permutation object
-         * @return value : permuted ciphertext
-        **/
-        Ciphertext applyPermutation(const Permutation &permutation);
+		Ciphertext & operator = (const Ciphertext & c);
 
-        /**
-         * Get the size of ciphertext in bytes
-         * @return value: size in bytes
-        **/
-        long size();
-    };
+		Ciphertext & operator = (Ciphertext && c);
 
+		/**
+			* Apply a permutation on the current ciphertxt 
+			* @param[in] permutation : permutation object to be applied
+		**/
+		void applyPermutation_inplace(const Permutation & permutation);
 
+		/**
+			* Permute the current ciphertext and return a new object
+			* @param[in] permutation: constant reference to permutation object
+			* @return value: permuted ciphertext
+		**/
+		Ciphertext applyPermutation(const Permutation & permutation);
+
+		/**
+			* Creates a deep copy for the current ciphertext
+			* This might be useful in a multithreading situation,
+			* When one wants to parralelise operations on different ctxt
+			* That originally shared at least a common CNODE node 
+			* (usually when one of them was obtained by applying an operation on the other)
+			* @return value: new ciphertext
+		**/
+		Ciphertext make_deep_copy() const;
+
+		/**
+			* Method for decrypting current ciphertext
+			* @param[in] sk: key under which decryption takes place
+			* @return value: decrypted value as an uint64_t (0 or 1)
+		**/
+		uint64_t decrypt_raw(const SecretKey & sk) const;
+
+		/**
+			* Method for decrypting current ciphertext
+			* @param[in] sk: key under which decryption takes place
+			* @return value: decrypted value as a plaintext object
+		**/
+		Plaintext decrypt(const SecretKey & sk) const; 
+
+	};
 }
 
 #endif
