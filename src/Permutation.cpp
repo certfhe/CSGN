@@ -56,14 +56,28 @@ namespace certFHE{
 	Permutation & Permutation::operator = (const Permutation & perm) {
 
 		this->length = perm.getLength();
+		this->inversions_cnt = perm.getInversionsCnt();
 
 		if (this->permutation != nullptr)
-			delete [] this->permutation;
+			delete[] this->permutation;
+
+		if (this->inversions != nullptr)
+			delete[] this->inversions;
 
 		this->permutation = new uint64_t [this->length];
+		this->inversions = new PermInversion[perm.inversions_cnt];
 
-		for(uint64_t i = 0; i < this->length; i++)
+		for (uint64_t i = 0; i < this->length; i++)
 			this->permutation[i] = perm.permutation[i];
+
+		for (uint64_t i = 0; i < this->inversions_cnt; i++)
+			this->inversions[i] = perm.inversions[i];
+
+		this->inversions_cnt = perm.inversions_cnt;
+
+#if CERTFHE_USE_CUDA
+		this->vram_inversions = (PermInversion *)CUDA_interface::RAM_TO_VRAM_copy(this->vram_inversions, perm.inversions_cnt * sizeof(PermInversion), 0);
+#endif
 
 		return *this;
 	}
@@ -93,7 +107,9 @@ namespace certFHE{
 
 		Permutation result(p, length, this_invcnt + other_invcnt, resultInvs);
 
-		delete [] p;
+		delete[] p;
+		delete[] resultInvs;
+
 		return result;
 	}
 
@@ -120,11 +136,21 @@ namespace certFHE{
 		for (i; i < this_invcnt + other_invcnt; i++)
 			thisNewInvs[i] = other.inversions[i - this_invcnt];
 
+		this->inversions_cnt += other.inversions_cnt;
+
 		delete[] this->permutation;
 		this->permutation = p;
 
 		delete[] this->inversions;
 		this->inversions = thisNewInvs;
+
+		this->inversions_cnt += other_invcnt;
+
+#if CERTFHE_USE_CUDA
+
+		CUDA_interface::VRAM_delete(this->vram_inversions);
+		this->vram_inversions = (PermInversion *)CUDA_interface::RAM_TO_VRAM_copy((void *)thisNewInvs, this->inversions_cnt * sizeof(PermInversion), 0);
+#endif
 
 		return *this;
 	}
@@ -178,7 +204,7 @@ namespace certFHE{
 		for (uint64_t i = 0; i < len; i++)
 			permutation[i] = i;
 
-#if MSVC_COMPILER_LOCAL_CERTFHE_MACRO // std::random_devide guaranteed by MSVC to be criptographically secure
+#if CERTFHE_MSVC_COMPILER_MACRO // std::random_devide guaranteed by MSVC to be criptographically secure
 
 		std::random_device csprng;
 
@@ -219,6 +245,11 @@ namespace certFHE{
 		}
 
 #endif
+
+#if CERTFHE_USE_CUDA
+		this->vram_inversions = (PermInversion *)CUDA_interface::RAM_TO_VRAM_copy((void *)this->inversions, this->inversions_cnt * sizeof(PermInversion), 0);
+#endif
+
 	}
 
 	Permutation::Permutation(const uint64_t * perm, const uint64_t len, uint64_t inv_cnt, const PermInversion * invs) {
@@ -234,6 +265,11 @@ namespace certFHE{
 
 		for (uint64_t i = 0; i < inv_cnt; i++)
 			this->inversions[i] = invs[i];
+
+#if CERTFHE_USE_CUDA
+		this->vram_inversions = (PermInversion *)CUDA_interface::RAM_TO_VRAM_copy((void *)this->inversions, this->inversions_cnt * sizeof(PermInversion), 0);
+#endif
+
 	}
 
 	Permutation::Permutation(const Permutation & perm) {
@@ -252,6 +288,11 @@ namespace certFHE{
 		
 		for (uint64_t i = 0; i < this->inversions_cnt; i++)
 			this->inversions[i] = _invs[i];
+
+#if CERTFHE_USE_CUDA
+		this->vram_inversions = (PermInversion *)CUDA_interface::RAM_TO_VRAM_copy((void *)this->inversions, this->inversions_cnt * sizeof(PermInversion), 0);
+#endif
+
 	}
 
 	Permutation::~Permutation(){
@@ -267,6 +308,12 @@ namespace certFHE{
 			delete[] this->inversions;
 			this->inversions = nullptr;
 		}
+
+#if CERTFHE_USE_CUDA
+
+		CUDA_interface::VRAM_delete(this->vram_inversions);
+		this->vram_inversions = nullptr;
+#endif
 
 		this->length = 0;
 		this->inversions_cnt = 0;

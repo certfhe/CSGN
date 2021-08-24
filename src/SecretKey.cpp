@@ -24,6 +24,12 @@ namespace certFHE{
 		for(uint64_t i = 0; i < secKey.length; i++)
 			this->s[i] = secKey.s[i];
 
+#if CERTFHE_USE_CUDA
+
+		if (this->vram_s_mask != nullptr)
+			CUDA_interface::VRAM_delete(this->vram_s_mask);
+#endif
+
 		this->set_mask_key();
 
 		return *this;
@@ -61,6 +67,12 @@ namespace certFHE{
 		}
 
 		this->s_mask = mask;
+		this->mask_length = default_len;
+
+#if CERTFHE_USE_CUDA
+		this->vram_s_mask = (uint64_t *)CUDA_interface::RAM_TO_VRAM_copy(this->s_mask, default_len * sizeof(uint64_t), 0);
+#endif
+
 	}
 
 	uint64_t * SecretKey::encrypt_raw_bit(unsigned char bit) const {
@@ -242,6 +254,11 @@ namespace certFHE{
 		this->s = newKey;
 
 		delete [] this->s_mask;
+
+#if CERTFHE_USE_CUDA
+		CUDA_interface::VRAM_delete(this->vram_s_mask);
+#endif
+
 		this->set_mask_key();
 
 		delete [] current_key;
@@ -287,6 +304,7 @@ namespace certFHE{
 		}
 		
 		this->set_mask_key();
+
 	}
 
 	SecretKey::SecretKey(const SecretKey & secKey) {
@@ -330,6 +348,13 @@ namespace certFHE{
 			delete this->certFHEContext;
 			this->certFHEContext = nullptr;
 		}
+
+#if CERTFHE_USE_CUDA
+
+		if (this->vram_s_mask != nullptr)
+			CUDA_interface::VRAM_delete(this->vram_s_mask);
+#endif
+
 	}
 
 #pragma endregion

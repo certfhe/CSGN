@@ -11,7 +11,7 @@ namespace certFHE{
 		//Introducing local time as seed for further pseudo random generator calls
 		srand((unsigned int)time(0));
 
-		if (initPools == true) 
+		if (initPools == true)
 			Library::threadpool = Threadpool <Args *> ::make_threadpool();
 		else
 			Library::threadpool = 0;

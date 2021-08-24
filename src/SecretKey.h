@@ -19,6 +19,12 @@ namespace certFHE {
         uint64_t * s;                    // secret positions from the vector [0,n-1]. 
 		uint64_t * s_mask;				 // secret key as a bitmask
 
+#if CERTFHE_USE_CUDA
+
+		uint64_t * vram_s_mask;			 // s_mask copy stored in VRAM for faster GPU decryption
+
+#endif
+
         uint64_t length;                 // length of the s vector, containing the secret posionts
 		uint64_t mask_length;		     // length of secret key as bitmask IN UINT64 CHUNKS
 
@@ -123,6 +129,15 @@ namespace certFHE {
 		 * DO NOT DELETE THIS POINTER
 		**/
 		uint64_t * getMaskKey() const { return this->s_mask; }
+
+#if CERTFHE_USE_CUDA
+
+		/**
+		 * DO NOT DELETE THIS POINTER
+		**/
+		uint64_t * getVramMaskKey() const { return this->vram_s_mask; }
+
+#endif
 
     };
 

@@ -839,15 +839,24 @@ namespace certFHE{
 	Ciphertext::Ciphertext(const Plaintext & plaintext, const SecretKey & sk) {
 
 		uint64_t * raw_ctxt = sk.encrypt_raw(plaintext);
-		this->node = new CCC(sk.getContext(), raw_ctxt, 1);
 
+#if CERTFHE_USE_CUDA
+		this->node = new CCC(sk.getContext(), raw_ctxt, 1, false);
+#else
+		this->node = new CCC(sk.getContext(), raw_ctxt, 1);
+#endif
+		
 		this->concurrency_guard = new CNODE_disjoint_set(this);
 	}
 
 	Ciphertext::Ciphertext(const void * plaintext, const SecretKey & sk) {
 
 		uint64_t * raw_ctxt = sk.encrypt_raw(plaintext);
+#if CERTFHE_USE_CUDA
+		this->node = new CCC(sk.getContext(), raw_ctxt, 1, false);
+#else
 		this->node = new CCC(sk.getContext(), raw_ctxt, 1);
+#endif
 
 		this->concurrency_guard = new CNODE_disjoint_set(this);
 	}
@@ -915,13 +924,23 @@ namespace certFHE{
 	Ciphertext::Ciphertext(const Plaintext & plaintext, const SecretKey & sk) {
 
 		uint64_t * raw_ctxt = sk.encrypt_raw(plaintext);
+
+#if CERTFHE_USE_CUDA
+		this->node = new CCC(sk.getContext(), raw_ctxt, 1, false, false);
+#else
 		this->node = new CCC(sk.getContext(), raw_ctxt, 1);
+#endif
 	}
 
 	Ciphertext::Ciphertext(const void * plaintext, const SecretKey & sk) {
 
 		uint64_t * raw_ctxt = sk.encrypt_raw(plaintext);
+
+#if CERTFHE_USE_CUDA
+		this->node = new CCC(sk.getContext(), raw_ctxt, 1, false, false);
+#else
 		this->node = new CCC(sk.getContext(), raw_ctxt, 1);
+#endif
 	}
 
 	Ciphertext::Ciphertext(const Ciphertext & ctxt) {

@@ -1,7 +1,8 @@
 #ifndef ARG_CLASSES_H
 #define ARG_CLASSES_H
 
-#include "utils.h"
+#include <condition_variable>
+#include <mutex>
 
 namespace certFHE{
 

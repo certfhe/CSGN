@@ -14,9 +14,14 @@
 **/
 #define CERTFHE_MULTITHREADING_EXTENDED_SUPPORT true
 
-#define MSVC_COMPILER_LOCAL_CERTFHE_MACRO (_MSC_VER && !__INTEL_COMPILER)
+#define CERTFHE_MSVC_COMPILER_MACRO (_MSC_VER && !__INTEL_COMPILER)
 
-#define GPP_COMPILER_LOCAL_CERTFHE_MACRO __GNUC__
+#define CERTFHE_GNU_COMPILER_MACRO __GNUC__
+
+/**
+ * MACRO to ENABLE/DISABLE use of GPU found inside CUDA_interface.h
+**/
+#include "CUDA_interface.h"
 
 #include <stdio.h>
 #include <iostream>
@@ -24,7 +29,7 @@
 
 #include <immintrin.h>
 
-#if MSVC_COMPILER_LOCAL_CERTFHE_MACRO
+#if CERTFHE_MSVC_COMPILER_MACRO
 #include <intrin.h>
 #endif
 

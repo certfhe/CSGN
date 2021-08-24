@@ -5,6 +5,7 @@
 #include "SecretKey.h"
 #include "Plaintext.h"
 #include "Permutation.h"
+#include "utils.h"
 
 namespace certFHE {
 
@@ -34,6 +35,8 @@ namespace certFHE {
 #pragma endregion
 
 #pragma region MTValues definitions
+
+	std::mutex MTValues::mtvalues_mutex;
 
 	uint64_t MTValues::cpy_m_threshold = 0;
 	uint64_t MTValues::dec_m_threshold = 0;
@@ -133,6 +136,13 @@ namespace certFHE {
 		OPValues::max_cadd_merge_size = -1;
 		OPValues::max_cmul_merge_size = -1;
 
+#if CERTFHE_USE_CUDA
+
+		uint64_t old_gpu_deflen_threshold = GPUValues::gpu_deflen_threshold;
+		GPUValues::gpu_deflen_threshold = -1;
+
+#endif
+
 		for (uint64_t ts = 0; ts < AUTOSELECT_TEST_CNT; ts++) {
 
 			MTValues::dec_m_threshold = 0;
@@ -183,6 +193,12 @@ namespace certFHE {
 		OPValues::max_cadd_merge_size = old_max_cadd_merge_size;
 		OPValues::max_cmul_merge_size = old_max_cmul_merge_size;
 
+#if CERTFHE_USE_CUDA
+
+		GPUValues::gpu_deflen_threshold = old_gpu_deflen_threshold;
+
+#endif
+
 		//for (int threshold_log = 1; threshold_log < MAX_L_LOG; threshold_log++)
 			//std::cout << observed_multithreading[threshold_log] << " " << observed_sequential[threshold_log] << '\n';
 
@@ -219,6 +235,13 @@ namespace certFHE {
 		OPValues::max_ccc_deflen_size = -1;
 		OPValues::max_cadd_merge_size = -1;
 		OPValues::max_cmul_merge_size = -1;
+
+#if CERTFHE_USE_CUDA
+
+		uint64_t old_gpu_deflen_threshold = GPUValues::gpu_deflen_threshold;
+		GPUValues::gpu_deflen_threshold = -1;
+
+#endif
 
 		for (uint64_t ts = 0; ts < AUTOSELECT_TEST_CNT; ts++) {
 
@@ -306,6 +329,12 @@ namespace certFHE {
 		OPValues::max_cadd_merge_size = old_max_cadd_merge_size;
 		OPValues::max_cmul_merge_size = old_max_cmul_merge_size;
 
+#if CERTFHE_USE_CUDA
+
+		GPUValues::gpu_deflen_threshold = old_gpu_deflen_threshold;
+
+#endif
+
 		//for (int threshold_log = 2; threshold_log < MAX_L_LOG; threshold_log++)
 			//std::cout << observed_multithreading[threshold_log] << " " << observed_sequential[threshold_log] << '\n';
 
@@ -342,6 +371,13 @@ namespace certFHE {
 		OPValues::max_ccc_deflen_size = -1;
 		OPValues::max_cadd_merge_size = -1;
 		OPValues::max_cmul_merge_size = -1;
+
+#if CERTFHE_USE_CUDA
+
+		uint64_t old_gpu_deflen_threshold = GPUValues::gpu_deflen_threshold;
+		GPUValues::gpu_deflen_threshold = -1;
+
+#endif
 
 		for (uint64_t ts = 0; ts < AUTOSELECT_TEST_CNT; ts++) {
 
@@ -421,6 +457,12 @@ namespace certFHE {
 		OPValues::max_cadd_merge_size = old_max_cadd_merge_size;
 		OPValues::max_cmul_merge_size = old_max_cmul_merge_size;
 
+#if CERTFHE_USE_CUDA
+
+		GPUValues::gpu_deflen_threshold = old_gpu_deflen_threshold;
+
+#endif
+
 		//for (int threshold_log = 6; threshold_log < MAX_L_LOG; threshold_log += 2)
 			//std::cout << observed_multithreading[threshold_log] << " " << observed_sequential[threshold_log] << '\n';
 
@@ -457,6 +499,13 @@ namespace certFHE {
 		OPValues::max_ccc_deflen_size = -1;
 		OPValues::max_cadd_merge_size = -1;
 		OPValues::max_cmul_merge_size = -1;
+
+#if CERTFHE_USE_CUDA
+
+		uint64_t old_gpu_deflen_threshold = GPUValues::gpu_deflen_threshold;
+		GPUValues::gpu_deflen_threshold = -1;
+
+#endif
 
 		for (uint64_t ts = 0; ts < AUTOSELECT_TEST_CNT; ts++) {
 
@@ -515,6 +564,12 @@ namespace certFHE {
 		OPValues::max_cadd_merge_size = old_max_cadd_merge_size;
 		OPValues::max_cmul_merge_size = old_max_cmul_merge_size;
 
+#if CERTFHE_USE_CUDA
+
+		GPUValues::gpu_deflen_threshold = old_gpu_deflen_threshold;
+
+#endif
+
 		//for (int threshold_log = 1; threshold_log < MAX_L_LOG; threshold_log++)
 			//std::cout << observed_multithreading[threshold_log] << " " << observed_sequential[threshold_log] << '\n';
 
@@ -528,6 +583,8 @@ namespace certFHE {
 	}
 
 	void MTValues::cpy_m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
+
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
 
 		if (cache_in_file) {
 
@@ -572,6 +629,8 @@ namespace certFHE {
 
 	void MTValues::dec_m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
 
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
+
 		if (cache_in_file) {
 
 			std::fstream cache(cache_file_name, std::ios::binary | std::ios::out | std::ios::in);
@@ -613,6 +672,8 @@ namespace certFHE {
 	}
 
 	void MTValues::mul_m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
+
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
 
 		if (cache_in_file) {
 
@@ -656,6 +717,8 @@ namespace certFHE {
 
 	void MTValues::add_m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
 
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
+
 		if (cache_in_file) {
 
 			std::fstream cache(cache_file_name, std::ios::binary | std::ios::out | std::ios::in);
@@ -698,6 +761,8 @@ namespace certFHE {
 
 	void MTValues::perm_m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
 
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
+
 		if (cache_in_file) {
 
 			std::fstream cache(cache_file_name, std::ios::binary | std::ios::out | std::ios::in);
@@ -739,6 +804,8 @@ namespace certFHE {
 	}
 
 	void MTValues::m_threshold_autoselect(const Context & context, bool cache_in_file, std::string cache_file_name) {
+
+		std::lock_guard <std::mutex> lock(MTValues::mtvalues_mutex);
 
 		if (cache_in_file) {
 
@@ -817,6 +884,34 @@ namespace certFHE {
 	}
 
 #pragma endregion
+
+#if CERTFHE_USE_CUDA
+#pragma region GPUValues definitions
+
+	/**
+	 * Minimum threshold for using GPU for processing and its video RAM for storage
+	 * measured in default length multiples
+	**/
+	uint64_t GPUValues::gpu_deflen_threshold = 2;
+
+	/**
+	 * Current quantity of video RAM used for storing ciphertext chunks
+	 * measured in default length multiples
+	**/
+	uint64_t GPUValues::gpu_current_vram_deflen_usage = 0;
+
+	/**
+	 * Maximum quantity of video RAM used for storing ciphertext chunks
+	 * measured in default length multiples
+	 * For every copy, permutation, allocation or operation result
+	 * if the default length + current gpu vram usage is GREATER that this value
+	 * (at least before executing the operation)
+	 * it will be stored on host RAM
+	**/
+	uint64_t GPUValues::gpu_max_vram_deflen_usage = 16;
+
+#pragma endregion
+#endif
 
 }
 
