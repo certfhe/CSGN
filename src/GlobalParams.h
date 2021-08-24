@@ -95,7 +95,11 @@ namespace certFHE {
 	**/
 	class MTValues {
 
-		//static std::mutex mtvalues_mutex;
+		/**
+		 * Mutex to assure sequential execution 
+		 * of autoselect methods in a multithreading context
+		**/
+		static std::mutex mtvalues_mutex;
 
 		/**
 		 * number of tests to be averaged 
@@ -108,6 +112,11 @@ namespace certFHE {
 		 * in an automatic threshold selection
 		**/
 		static const uint64_t ROUND_PER_TEST_CNT = 50; 
+
+		/**
+		 * The following 5 methods
+		 * Are NOT guarded with mtvalues_mutex
+		**/
 
 		static void __cpy_m_threshold_autoselect(const Context & context);
 		static void __dec_m_threshold_autoselect(const Context & context);
@@ -157,10 +166,45 @@ namespace certFHE {
 		 * Automatic tests for selecting the threshold
 		 * Under which sequential code is used 
 		 * To perform operations on CCC objects
+		 * (protected by mtvalues_mutex)
 		**/
 		static void m_threshold_autoselect(const Context & context, bool cache_in_file = true, std::string cache_file_name = "m_thrsh_cache.bin");
 	};
 
+
+#if CERTFHE_USE_CUDA
+
+	/**
+	 * Class for (CUDA ONLY) GPU usage parameter values
+	**/
+	class GPUValues {
+
+	public:
+
+		/**
+		 * Minimum threshold for using GPU for processing and its video RAM for storage
+		 * measured in default length multiples
+		**/
+		static uint64_t gpu_deflen_threshold;
+		
+		/**
+		 * Current quantity of video RAM used for storing ciphertext chunks
+		 * measured in default length multiples
+		**/
+		static uint64_t gpu_current_vram_deflen_usage;
+
+		/**
+		 * Maximum quantity of video RAM used for storing ciphertext chunks
+		 * measured in default length multiples
+		 * For every copy, permutation, allocation or operation result
+		 * if the default length + current gpu vram usage is GREATER that this value
+		 * (at least before executing the operation)
+		 * it will be stored on host RAM
+		**/
+		static uint64_t gpu_max_vram_deflen_usage;
+	};
+
+#endif
 }
 
 #endif

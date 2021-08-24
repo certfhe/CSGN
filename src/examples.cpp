@@ -170,8 +170,3 @@ void basic_permutation_second_examples() {
 
 	certFHE::Plaintext d1 = permuted_c.decrypt(permuted_sk);
 }
-
-int main() {
-
-	return 0;
-}
