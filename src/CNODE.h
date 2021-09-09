@@ -18,8 +18,6 @@ namespace certFHE {
 
 	protected:
 
-		static std::unordered_map <CNODE *, unsigned char> decryption_cached_values;
-
 		/**
 		 * certFHE context
 		 * ASSUMED to have the exact same values for its attributes
@@ -92,7 +90,11 @@ namespace certFHE {
 		**/
 		virtual CNODE * make_deep_copy() = 0; 
 
-		virtual uint64_t decrypt(const SecretKey & sk) = 0;
+#if CERTFHE_USE_CUDA
+		virtual uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) = 0;
+#else
+		virtual uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) = 0;
+#endif
 
 		/**
 		 * Used to permute both inplace or on a new (deep) copy
@@ -100,18 +102,38 @@ namespace certFHE {
 		virtual CNODE * permute(const Permutation & perm, bool force_deep_copy) = 0;
 
 		/**
+		 * The "serialization recon" recursive function has two roles:
+		 *		-> Identifying and inserting in the map received as the argument 
+		 *		   all the upstream referenced nodes that need to be serialized
+		 *		   that were previously not found
+		 *		-> Calculating the space required for the current node's serialization (in bytes)
+		**/
+		virtual void serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) = 0;
+
+		/**
+		 * Serialization function 
+		**/
+		virtual void serialize(unsigned char * serialization_buffer, std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) = 0;
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+		/**
+		 * Method that helps to manually rebuild the CNODE_disjoint_set structure
+		 * When deserializing a serialization created inside an implementation without extended multithreading support
+		 *
+		 * The argument map will temporarily directly associate every CNODE with a Ciphertext "root"
+		 * When a CNODE is recursively found to have already been associated with a Ciphertext,
+		 * The merge operation is called on the guards of those two Ciphertexts
+		**/
+		virtual void concurrency_guard_structure_rebuild(std::unordered_map <CNODE *, Ciphertext *> & node_to_ctxt, Ciphertext * associated_ctxt) = 0;
+
+#endif
+
+		/**
 		 * Method used instead of directly deleting the current node
 		 * Decides whether to decrease reference count or actually delete the node
 		**/
 		void try_delete();
-
-	public:
-
-		/**
-		 * Method used to clear the decryption cache
-		 * Should ALWAYS BE CALLED between decryptions, if additions or multiplications are being performed
-		**/
-		static void clear_decryption_cache() { CNODE::decryption_cached_values.clear(); }
 
 		// Other
 

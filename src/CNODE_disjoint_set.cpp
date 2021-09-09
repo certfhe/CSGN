@@ -4,14 +4,12 @@
 #if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
 
 namespace certFHE {
-
-	std::mutex CNODE_disjoint_set::op_mutex;
 	
-	CNODE_disjoint_set * CNODE_disjoint_set::__get_root() {
+	CNODE_disjoint_set * CNODE_disjoint_set::get_root() {
 
 		if (this->parent != 0) {
 
-			CNODE_disjoint_set * root = this->parent->__get_root();
+			CNODE_disjoint_set * root = this->parent->get_root();
 
 			/**
 			 * condition to reduce overhead 
@@ -56,10 +54,10 @@ namespace certFHE {
 			return this;
 	}
 
-	void CNODE_disjoint_set::__set_union(CNODE_disjoint_set * other) {
+	void CNODE_disjoint_set::set_union(CNODE_disjoint_set * other) {
 
-		CNODE_disjoint_set * fst_root = this->__get_root();
-		CNODE_disjoint_set * snd_root = other->__get_root();
+		CNODE_disjoint_set * fst_root = this->get_root();
+		CNODE_disjoint_set * snd_root = other->get_root();
 
 		if (fst_root == snd_root)
 			return;
@@ -91,7 +89,7 @@ namespace certFHE {
 			fst_root->rank += 1;
 	}
 
-	CNODE_disjoint_set * CNODE_disjoint_set::__remove_from_set() {
+	CNODE_disjoint_set * CNODE_disjoint_set::remove_from_set() {
 
 		if (this->child == 0) {
 
@@ -137,7 +135,7 @@ namespace certFHE {
 			std::swap(this->current->concurrency_guard, this->child->current->concurrency_guard);
 			std::swap(this->current, this->child->current);
 			
-			return this->child->__remove_from_set();
+			return this->child->remove_from_set();
 		}
 	}
 }

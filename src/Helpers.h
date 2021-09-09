@@ -15,9 +15,14 @@ namespace certFHE{
         Library() {}
 
 		/**
-			* Threadpool for multithreading multiplication at the library level
+		 * Threadpool for multithreading multiplication at the library level
 		**/
 		static Threadpool <Args *> * threadpool;
+
+		/**
+		 * File from where to load Ciphertext/CNODE next IDs 
+		**/
+		
 
     public:
 

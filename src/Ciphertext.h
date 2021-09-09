@@ -33,10 +33,15 @@ namespace certFHE{
 #if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
 
 		/**
+		 * Mutex for synchronization of operations on disjoint sets
+		**/
+		static std::mutex op_mutex;
+
+		/**
 		 * Used to get a common mutex for all ciphertexts 
 		 * that (might) share a common internal CNODE
 		**/
-		CNODE_disjoint_set * concurrency_guard;
+		mutable CNODE_disjoint_set * concurrency_guard;
 
 #endif
 
@@ -56,7 +61,48 @@ namespace certFHE{
 		**/
 		static CNODE * multiply(CNODE * fst, CNODE * snd);
 
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+		/**
+		 * Method to manually rebuild the CNODE_disjoint_set structure
+		 * When deserializing a serialization created inside an implementation without extended multithreading support
+		 * 
+		 * NOTE: it has the potential of significantly slowing down the deserialization 
+		**/
+		static void concurrency_guard_structure_rebuild(const int ctxt_count, Ciphertext ** deserialized);
+
+		/**
+		 * Method for finding the root and locking its mutex under the op_mutex
+		**/
+		static std::unique_lock <std::mutex> * lock_guard(const Ciphertext * ctxt);
+
+		/**
+		 * Method that finds the fst and snd roots, locks them and then performs union between res and fst, and res and snd
+		 * (It does NOT lock res guard)
+		 *
+		 * NOTES: -> Currently used for +, *, +=, *=
+		 *		  -> It also performs the CCC op shortcut check
+		**/
+		static std::pair <std::unique_lock <std::mutex> *, std::unique_lock <std::mutex> *> lock_guard_and_union(const Ciphertext * fst, const Ciphertext * snd, const Ciphertext * res, bool CCC_shortcut);
+
+#endif
+
 	public:
+
+		/**
+		 * Serialization (into bytes) function
+		 * This function ASSUMES all the ciphertexts were encrypted under the same context (or at least an equal one)
+		 * Returns a pointer to the serialization array and its byte length
+		**/
+		static std::pair <unsigned char *, int> serialize(const int ctxt_count, Ciphertext ** to_serialize_arr);
+
+		/**
+		 * This method takes a full serialization array (containing one or more serialized ciphertexts)
+		 * And returns an array of pointers to heap-allocated deserialized ciphertexts
+		 * It ASSUMES all the serialized Ciphertexts / CNODEs do not have duplicates inside the same serialization
+		**/
+		static std::pair <Ciphertext **, Context> deserialize(unsigned char * serialization);
 
 		Ciphertext();
 
@@ -140,6 +186,12 @@ namespace certFHE{
 			* @return value: decrypted value as a plaintext object
 		**/
 		Plaintext decrypt(const SecretKey & sk) const; 
+
+		// Other
+
+		friend class CCC;
+		friend class COP;
+		friend class CNODE_disjoint_set;
 
 	};
 }

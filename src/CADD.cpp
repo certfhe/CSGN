@@ -113,13 +113,16 @@ namespace certFHE {
 		//}
 	}
 
-	uint64_t CADD::decrypt(const SecretKey & sk) {
-
+#if CERTFHE_USE_CUDA
+	uint64_t CADD::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) {
+#else
+	uint64_t CADD::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) {
+#endif
 		if (OPValues::decryption_cache) {
 
-			auto cache_entry = CNODE::decryption_cached_values.find(this);
+			auto cache_entry = decryption_cached_values->find(this);
 
-			if (cache_entry != CNODE::decryption_cached_values.end())
+			if (cache_entry != decryption_cached_values->end())
 				return (uint64_t)cache_entry->second;
 		}
 
@@ -132,12 +135,16 @@ namespace certFHE {
 
 		while (thisnodes != 0 && thisnodes->current != 0) {
 
-			rez ^= thisnodes->current->decrypt(sk);
+#if CERTFHE_USE_CUDA
+			rez ^= thisnodes->current->decrypt(sk, decryption_cached_values, vram_decryption_cached_values);
+#else
+			rez ^= thisnodes->current->decrypt(sk, decryption_cached_values);
+#endif
 			thisnodes = thisnodes->next;
 		}
 		
 		if (OPValues::decryption_cache)
-			CNODE::decryption_cached_values[this] = (unsigned char)rez;
+			(*decryption_cached_values)[this] = (unsigned char)rez;
 
 		return rez;
 	}
@@ -170,6 +177,63 @@ namespace certFHE {
 		}
 
 		return deepcopy;
+	}
+
+	void CADD::serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		static uint32_t temp_CADD_id = 0b01;
+
+		uint64_t upstream_ref_cnt = 0; // number of nodes in CNODE_list WITHOUT dummy (first) element
+
+		CNODE_list * thisnodes = this->nodes->next;
+		while (thisnodes != 0 && thisnodes->current != 0) {
+
+			if (addr_to_id.find(thisnodes->current) == addr_to_id.end()) 
+				thisnodes->current->serialize_recon(addr_to_id);
+
+			upstream_ref_cnt += 1;
+			thisnodes = thisnodes->next;
+		}
+
+		addr_to_id[this] = { temp_CADD_id, (int)(sizeof(uint32_t) + 2 * sizeof(uint64_t) + upstream_ref_cnt * sizeof(uint32_t)) };
+		temp_CADD_id += 0b100;
+	}
+
+	int CADD::deserialize(unsigned char * serialized, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialized;
+		uint32_t id = ser_int32[0];
+
+		uint64_t * ser_int64 = (uint64_t *)(serialized + sizeof(uint32_t));
+
+		uint64_t deflen_cnt = ser_int64[0];
+		uint64_t deflen_to_u64 = context.getDefaultN();
+
+		uint64_t upstream_ref_cnt = ser_int64[1];
+
+		if (!already_created) {
+
+			CADD * deserialized = new CADD(&context);
+			deserialized->downstream_reference_count = 0; // it will be fixed later
+
+			id_to_addr[id] = deserialized;
+		}
+		else {
+
+			CADD * deserialized = (CADD *)id_to_addr.at(id);
+
+			for (int i = 0; i < upstream_ref_cnt; i++) {
+
+				uint32_t upstream_ref_id = ser_int32[5 + i];
+				CNODE * upstream_ref = (CNODE *)id_to_addr.at(upstream_ref_id);
+
+				upstream_ref->downstream_reference_count += 1;
+
+				deserialized->nodes->insert_next_element(upstream_ref);
+			}
+		}
+
+		return (int)(upstream_ref_cnt + 5);
 	}
 
 	CNODE * CADD::permute(const Permutation & perm, bool force_deep_copy) {
@@ -422,30 +486,11 @@ namespace certFHE {
 			return fst;
 		}
 
-		CADD * merged;
+		CADD * merged = new CADD(*fst);
 
-		/**
-		 * Check to see whether the first node is referenced multiple times or not
-		 * if not, the changes will be done inplace to save time
-		**/
-		if (fst->downstream_reference_count == 1) {
-
-			fst->downstream_reference_count += 1;
-
-			snd->downstream_reference_count += 1;
-			fst->nodes->insert_next_element(snd); // insertion on second position, order does not matter (as long as dummy element remains on first position)
-			fst->deflen_count += snd->deflen_count;
-
-			merged = fst;
-		}
-		else {
-
-			merged = new CADD(*fst);
-
-			snd->downstream_reference_count += 1;
-			merged->nodes->insert_next_element(snd); 
-			merged->deflen_count += snd->deflen_count;
-		}
+		snd->downstream_reference_count += 1;
+		merged->nodes->insert_next_element(snd); 
+		merged->deflen_count += snd->deflen_count;
 
 		merged->upstream_merging();
 
@@ -460,7 +505,6 @@ namespace certFHE {
 		}
 
 		return merged;
-
 	}
 	
 	CNODE * CADD::__upstream_merging(CMUL * fst, CMUL * snd) { 
@@ -484,6 +528,10 @@ namespace certFHE {
 
 		CADD * merged;
 
+		/**
+		 * Check to see whether the first node is referenced multiple times or not
+		 * if not, the changes will be done inplace to save time
+		**/
 		if (fst->downstream_reference_count == 1) {
 
 			fst->downstream_reference_count += 1;
