@@ -4,7 +4,7 @@
 namespace certFHE {
 
 	void CMUL::upstream_merging() {
-		
+
 		if (OPValues::no_merging)
 			return;
 
@@ -95,13 +95,16 @@ namespace certFHE {
 		//}
 	}
 
-	uint64_t CMUL::decrypt(const SecretKey & sk) {
-
+#if CERTFHE_USE_CUDA
+	uint64_t CMUL::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) {
+#else
+	uint64_t CMUL::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) {
+#endif
 		if (OPValues::decryption_cache) {
 
-			auto cache_entry = CNODE::decryption_cached_values.find(this);
+			auto cache_entry = decryption_cached_values->find(this);
 
-			if (cache_entry != CNODE::decryption_cached_values.end())
+			if (cache_entry != decryption_cached_values->end())
 				return (uint64_t)cache_entry->second;
 		}
 
@@ -114,12 +117,16 @@ namespace certFHE {
 
 		while (thisnodes != 0 && thisnodes->current != 0) {
 
-			rez &= thisnodes->current->decrypt(sk);
+#if CERTFHE_USE_CUDA
+			rez &= thisnodes->current->decrypt(sk, decryption_cached_values, vram_decryption_cached_values);
+#else
+			rez &= thisnodes->current->decrypt(sk, decryption_cached_values);
+#endif
 			thisnodes = thisnodes->next;
 		}
 
 		if (OPValues::decryption_cache)
-			CNODE::decryption_cached_values[this] = (unsigned char)rez;
+			(*decryption_cached_values)[this] = (unsigned char)rez;
 
 		return rez;
 	}
@@ -146,6 +153,63 @@ namespace certFHE {
 		}
 
 		return deepcopy;
+	}
+
+	void CMUL::serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		static uint32_t temp_CMUL_id = 0b10; 
+
+		uint64_t upstream_ref_cnt = 0; // number of nodes in CNODE_list WITHOUT dummy (first) element
+
+		CNODE_list * thisnodes = this->nodes->next;
+		while (thisnodes != 0 && thisnodes->current != 0) {
+
+			if (addr_to_id.find(thisnodes->current) == addr_to_id.end())
+				thisnodes->current->serialize_recon(addr_to_id);
+
+			upstream_ref_cnt += 1;
+			thisnodes = thisnodes->next;
+		}
+
+		addr_to_id[this] = { temp_CMUL_id, (int)(sizeof(uint32_t) + 2 * sizeof(uint64_t) + upstream_ref_cnt * sizeof(uint32_t)) };
+		temp_CMUL_id += 0b100;
+	}
+
+	int CMUL::deserialize(unsigned char * serialized, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialized;
+		uint32_t id = ser_int32[0];
+
+		uint64_t * ser_int64 = (uint64_t *)(serialized + sizeof(uint32_t));
+
+		uint64_t deflen_cnt = ser_int64[0];
+		uint64_t deflen_to_u64 = context.getDefaultN();
+
+		uint64_t upstream_ref_cnt = ser_int64[1];
+
+		if (!already_created) {
+
+			CMUL * deserialized = new CMUL(&context);
+			deserialized->downstream_reference_count = 0; // it will be set later
+
+			id_to_addr[id] = deserialized;
+		}
+		else {
+
+			CMUL * deserialized = (CMUL *)id_to_addr.at(id);
+
+			for (int i = 0; i < upstream_ref_cnt; i++) {
+
+				uint32_t upstream_ref_id = ser_int32[5 + i];
+				CNODE * upstream_ref = (CNODE *)id_to_addr.at(upstream_ref_id);
+
+				upstream_ref->downstream_reference_count += 1;
+
+				deserialized->nodes->insert_next_element(upstream_ref);
+			}
+		}
+
+		return (int)(upstream_ref_cnt + 5);
 	}
 
 	std::ostream & operator << (std::ostream & out, const CMUL & cmul) {
@@ -249,10 +313,8 @@ namespace certFHE {
 
 		return 0;
 	}
-	//
+	
 	CNODE * CMUL::__upstream_merging(CADD * fst, CADD * snd) { 
-
-		//return 0;
 
 		/**
 		 * Check maximum operation size for when to try to merge or not
@@ -356,10 +418,8 @@ namespace certFHE {
 
 		return distributed_mul;
 	}
-	//
+	
 	CNODE * CMUL::__upstream_merging(CADD * fst, CMUL * snd) { 
-
-		//return 0;
 		
 		/**
 		 * Check maximum operation size for when to try to merge or not
@@ -580,10 +640,8 @@ namespace certFHE {
 
 		return merged;
 	}
-	//
+	
 	CNODE * CMUL::__upstream_merging(CADD * fst, CCC * snd) { 
-
-		//return 0;
 		
 		/**
 		 * Check maximum operation size for when to try to merge or not
@@ -676,7 +734,11 @@ namespace certFHE {
 
 	CNODE * CMUL::__upstream_merging(CCC * fst, CCC * snd) { 
 		
-		if (fst->deflen_count * snd->deflen_count > OPValues::max_ccc_deflen_size)
+		if ((fst->deflen_count * snd->deflen_count > OPValues::max_ccc_deflen_size) &&
+			(OPValues::always_default_multiplication == false ||
+				(OPValues::always_default_multiplication && (fst->deflen_count != 1) && (snd->deflen_count != 1))
+				)
+			)
 			return 0;
 
 		else

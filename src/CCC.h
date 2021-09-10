@@ -94,6 +94,25 @@ namespace certFHE {
 		**/
 		CNODE * make_deep_copy() override { return new CCC(*this); }
 
+		void serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) override;
+
+		void serialize(unsigned char * serialization_buffer, std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) override;
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+		void concurrency_guard_structure_rebuild(std::unordered_map <CNODE *, Ciphertext *> & node_to_ctxt, Ciphertext * associated_ctxt) override;
+#endif
+
+		/**
+		 * Deserialization function
+		 *
+		 * already_created == false -> completely deserializez the corresponding bytes and creates a CCC object
+		 * already_created == true -> does nothing, method called with this value only for the return quantity
+		 *
+		 * Returns the offset IN MULTIPLES OF SIZEOF(UINT32_T) BYTES (relative to the received pointer) to the next serialization ID
+		**/
+		static int deserialize(unsigned char * serialized, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created);
+
 		/**
 			* Add two chunks of ciphertxts --- for multithreading only ---
 			* @param[in] args: input sent as a pointer to an AddArgs object
@@ -136,7 +155,11 @@ namespace certFHE {
 		**/
 		static CCC * multiply(CCC * fst, CCC * snd);
 
-		uint64_t decrypt(const SecretKey & sk) override;
+#if CERTFHE_USE_CUDA
+		uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) override;
+#else
+		uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) override;
+#endif
 
 		/**
 		 * It will create a copy and permute it if the ref count is > 1

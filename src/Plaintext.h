@@ -16,7 +16,7 @@ namespace certFHE{
 
 		Plaintext() : value(0) {}
 
-		Plaintext(uint64_t value) : value(BIT(value)) {}
+		Plaintext(uint64_t value) : value(value & 0x01) {}
 
 		virtual ~Plaintext() {}
 
@@ -24,7 +24,7 @@ namespace certFHE{
          * Getter and setter
         **/
 		unsigned char getValue() const { return this->value; }
-		void setValue(unsigned char value) { this->value = BIT(value); }
+		void setValue(unsigned char value) { this->value = (value & 0x01); }
 
         /**
          * Friend class for operator <<

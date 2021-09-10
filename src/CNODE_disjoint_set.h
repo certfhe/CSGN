@@ -11,15 +11,9 @@ namespace certFHE {
 	 * Class that implements disjoint set forest 
 	 * With path compression, union by rank
 	 * And CUSTOM deletion
-	 * (currently) used for multithreading mutex selection
+	 * (currently) only used for multithreading mutex selection
 	**/
 	class CNODE_disjoint_set {
-
-		/**
-		 * mutex that is required to be locked in order to do ANY operation on ANY set
-		 * (so, there can only be one thread at a time that searches root / does union / removes)
-		**/
-		static std::mutex op_mutex; 
 
 	public:
 
@@ -47,51 +41,23 @@ namespace certFHE {
 
 		~CNODE_disjoint_set() {}
 
-		// set operations WITHOUT thread safety
-
-		/**
-		 * NO OP_MUTEX LOCK
-		**/
-		CNODE_disjoint_set * __get_root();
-
-		/**
-		 * NO OP_MUTEX LOCK
-		**/
-		void __set_union(CNODE_disjoint_set * other);
-
-		/**
-		 * NO OP_MUTEX LOCK
-		**/
-		CNODE_disjoint_set * __remove_from_set();
-
 		/**
 		 * Get the root of the set
+		 * With path compression
 		**/
-		CNODE_disjoint_set * get_root() {
-
-			std::lock_guard <std::mutex> guard(op_mutex);
-			return this->__get_root();
-		}
+		CNODE_disjoint_set * get_root();
 
 		/**
-		 * Union of two sets (this, other)
+		 * Union (by rank) of two sets (this, other)
 		**/
-		void set_union(CNODE_disjoint_set * other) {
-
-			std::lock_guard <std::mutex> guard(op_mutex);
-			this->__set_union(other);
-		}
+		void set_union(CNODE_disjoint_set * other);
 
 		/**
 		 * CUSTOM remove operation
 		 * Swaps associated Ciphertext object with a child node until a leaf is found
 		 * When the node is a leaf, it is deleted
 		**/
-		CNODE_disjoint_set * remove_from_set() {
-
-			std::lock_guard <std::mutex> guard(op_mutex);
-			return this->__remove_from_set();
-		}
+		CNODE_disjoint_set * remove_from_set();
 	};
 }
 

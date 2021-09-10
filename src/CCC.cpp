@@ -1,5 +1,12 @@
 #include "CCC.h"
 
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+#include "Ciphertext.h"
+#include "CNODE_disjoint_set.h"
+
+#endif
+
 namespace certFHE {
 
 #if CERTFHE_USE_CUDA
@@ -729,139 +736,159 @@ namespace certFHE {
 		return 0;
 	}
 
-	uint64_t CCC::decrypt(const SecretKey & sk) {
-
-		if (OPValues::decryption_cache) {
-
-			auto cache_entry = CNODE::decryption_cached_values.find(this);
-
-			if (cache_entry != CNODE::decryption_cached_values.end())
-				return (uint64_t)cache_entry->second;
-		}
+	uint64_t CCC::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) {
 
 		uint64_t dec = 0;
 
-		uint64_t deflen_cnt = this->deflen_count;
-		uint64_t deflen_to_u64 = this->context->getDefaultN();
-
-		uint64_t * sk_mask = sk.getMaskKey();
-		uint64_t * ctxt = this->ctxt;
-
 		if (this->on_GPU) {
 
+			if (OPValues::decryption_cache) {
+
+				auto cache_entry = vram_decryption_cached_values->find(this);
+
+				if (cache_entry != vram_decryption_cached_values->end())
+					return (uint64_t)cache_entry->second;
+			}
+
+			uint64_t deflen_cnt = this->deflen_count;
+			uint64_t deflen_to_u64 = this->context->getDefaultN();
+
+			uint64_t * sk_mask = sk.getMaskKey();
+			uint64_t * ctxt = this->ctxt;
+
 			dec = CUDA_interface::VRAM_ciphertext_decryption(deflen_to_u64, deflen_cnt, ctxt, sk.getVramMaskKey());
+
+			if (OPValues::decryption_cache)
+				(*vram_decryption_cached_values)[this] = (unsigned char)dec;
 		}
-		else if (deflen_cnt < MTValues::dec_m_threshold) {
+		else{
+
+			if (OPValues::decryption_cache) {
+
+				auto cache_entry = decryption_cached_values->find(this);
+
+				if (cache_entry != decryption_cached_values->end())
+					return (uint64_t)cache_entry->second;
+			}
+
+			uint64_t deflen_cnt = this->deflen_count;
+			uint64_t deflen_to_u64 = this->context->getDefaultN();
+
+			uint64_t * sk_mask = sk.getMaskKey();
+			uint64_t * ctxt = this->ctxt;
+
+			if (deflen_cnt < MTValues::dec_m_threshold) {
 
 #ifdef __AVX2__
 
-			for (uint64_t i = 0; i < deflen_cnt; i++) {
+				for (uint64_t i = 0; i < deflen_cnt; i++) {
 
-				uint64_t * current_chunk = ctxt + i * deflen_to_u64;
-				uint64_t current_decrypted = 0x01;
+					uint64_t * current_chunk = ctxt + i * deflen_to_u64;
+					uint64_t current_decrypted = 0x01;
 
-				uint64_t u = 0;
+					uint64_t u = 0;
 
-				for (; u + 4 <= deflen_to_u64; u += 4) {
+					for (; u + 4 <= deflen_to_u64; u += 4) {
 
-					__m256i avx_aux = _mm256_loadu_si256((const __m256i *)(current_chunk + u));
-					__m256i avx_mask = _mm256_loadu_si256((const __m256i *)(sk_mask + u));
+						__m256i avx_aux = _mm256_loadu_si256((const __m256i *)(current_chunk + u));
+						__m256i avx_mask = _mm256_loadu_si256((const __m256i *)(sk_mask + u));
 
-					avx_aux = _mm256_and_si256(avx_aux, avx_mask);
-					avx_aux = _mm256_xor_si256(avx_aux, avx_mask);
+						avx_aux = _mm256_and_si256(avx_aux, avx_mask);
+						avx_aux = _mm256_xor_si256(avx_aux, avx_mask);
 
-					current_decrypted &= _mm256_testz_si256(avx_aux, avx_aux);
+						current_decrypted &= _mm256_testz_si256(avx_aux, avx_aux);
+					}
+
+					for (; u < deflen_to_u64; u++)
+						current_decrypted &= ((current_chunk[u] & sk_mask[u]) ^ sk_mask[u]) == (uint64_t)0;
+
+					dec ^= current_decrypted;
 				}
-
-				for (; u < deflen_to_u64; u++)
-					current_decrypted &= ((current_chunk[u] & sk_mask[u]) ^ sk_mask[u]) == (uint64_t)0;
-
-				dec ^= current_decrypted;
-			}
 
 #else
 
-			for (uint64_t i = 0; i < deflen_cnt; i++) {
+				for (uint64_t i = 0; i < deflen_cnt; i++) {
 
-				uint64_t * current_chunk = ctxt + i * deflen_to_u64;
-				uint64_t current_decrypted = 0x01;
+					uint64_t * current_chunk = ctxt + i * deflen_to_u64;
+					uint64_t current_decrypted = 0x01;
 
-				for (uint64_t u = 0; u < deflen_to_u64; u++)
-					current_decrypted &= (((current_chunk[u] & sk_mask[u]) ^ sk_mask[u]) == (uint64_t)0);
+					for (uint64_t u = 0; u < deflen_to_u64; u++)
+						current_decrypted &= (((current_chunk[u] & sk_mask[u]) ^ sk_mask[u]) == (uint64_t)0);
 
-				dec ^= current_decrypted;
-			}
+					dec ^= current_decrypted;
+				}
 
 #endif
-		}
-		else {
-
-			Threadpool <Args *> * threadpool = Library::getThreadpool();
-			uint64_t thread_count = threadpool->get_threadcount();
-
-			uint64_t q;
-			uint64_t r;
-
-			uint64_t worker_cnt;
-
-			if (thread_count >= deflen_cnt) {
-
-				q = 1;
-				r = 0;
-
-				worker_cnt = deflen_cnt;
 			}
 			else {
 
-				q = deflen_cnt / thread_count;
-				r = deflen_cnt % thread_count;
+				Threadpool <Args *> * threadpool = Library::getThreadpool();
+				uint64_t thread_count = threadpool->get_threadcount();
 
-				worker_cnt = thread_count;
-			}
+				uint64_t q;
+				uint64_t r;
 
-			DecArgs * args = new DecArgs[worker_cnt];
+				uint64_t worker_cnt;
 
-			uint64_t prevchnk = 0;
+				if (thread_count >= deflen_cnt) {
 
-			for (uint64_t thr = 0; thr < worker_cnt; thr++) {
+					q = 1;
+					r = 0;
 
-				args[thr].to_decrypt = ctxt;
-				args[thr].sk_mask = sk_mask;
-
-				args[thr].default_len = deflen_to_u64;
-				args[thr].d = this->context->getD();
-
-				args[thr].fst_deflen_pos = prevchnk;
-				args[thr].snd_deflen_pos = prevchnk + q;
-
-				if (r > 0) {
-
-					args[thr].snd_deflen_pos += 1;
-					r -= 1;
+					worker_cnt = deflen_cnt;
 				}
-				prevchnk = args[thr].snd_deflen_pos;
+				else {
 
-				args[thr].decrypted = 0;
+					q = deflen_cnt / thread_count;
+					r = deflen_cnt % thread_count;
 
-				threadpool->add_task(&chunk_decrypt, args + thr);
+					worker_cnt = thread_count;
+				}
+
+				DecArgs * args = new DecArgs[worker_cnt];
+
+				uint64_t prevchnk = 0;
+
+				for (uint64_t thr = 0; thr < worker_cnt; thr++) {
+
+					args[thr].to_decrypt = ctxt;
+					args[thr].sk_mask = sk_mask;
+
+					args[thr].default_len = deflen_to_u64;
+					args[thr].d = this->context->getD();
+
+					args[thr].fst_deflen_pos = prevchnk;
+					args[thr].snd_deflen_pos = prevchnk + q;
+
+					if (r > 0) {
+
+						args[thr].snd_deflen_pos += 1;
+						r -= 1;
+					}
+					prevchnk = args[thr].snd_deflen_pos;
+
+					args[thr].decrypted = 0;
+
+					threadpool->add_task(&chunk_decrypt, args + thr);
+				}
+
+				for (uint64_t thr = 0; thr < worker_cnt; thr++) {
+
+					std::unique_lock <std::mutex> lock(args[thr].done_mutex);
+
+					args[thr].done.wait(lock, [thr, args] {
+						return args[thr].task_is_done;
+					});
+
+					dec ^= args[thr].decrypted;
+				}
+
+				delete[] args;
 			}
 
-			for (uint64_t thr = 0; thr < worker_cnt; thr++) {
-
-				std::unique_lock <std::mutex> lock(args[thr].done_mutex);
-
-				args[thr].done.wait(lock, [thr, args] {
-					return args[thr].task_is_done;
-				});
-
-				dec ^= args[thr].decrypted;
-			}
-
-			delete[] args;
+			if (OPValues::decryption_cache)
+				(*decryption_cached_values)[this] = (unsigned char)dec;
 		}
-
-		if (OPValues::decryption_cache)
-			CNODE::decryption_cached_values[this] = (unsigned char)dec;
 
 		return dec;
 	}
@@ -997,6 +1024,71 @@ namespace certFHE {
 		}
 
 		return to_permute;
+	}
+
+	void CCC::serialize(unsigned char * serialization_buffer, std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialization_buffer;
+		ser_int32[0] = addr_to_id.at(this).first;
+
+		uint64_t * ser_int64 = (uint64_t *)(serialization_buffer + sizeof(uint32_t));
+		ser_int64[0] = this->deflen_count;
+
+		uint64_t u64_len = this->deflen_count * this->context->getDefaultN();
+
+		if (this->on_GPU)
+			(void)CUDA_interface::VRAM_TO_RAM_copy(this->ctxt, u64_len * sizeof(uint64_t), ser_int64 + 1);
+		
+		else if (u64_len < MTValues::cpy_m_threshold) {
+
+			for (uint64_t i = 0; i < u64_len; i++)
+				ser_int64[i + 1] = this->ctxt[i];
+		}
+		else
+			Helper::u64_multithread_cpy(this->ctxt, ser_int64 + 1, u64_len);
+	}
+	
+	int CCC::deserialize(unsigned char * serialized, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialized;
+		uint32_t id = ser_int32[0];
+
+		uint64_t * ser_int64 = (uint64_t *)(serialized + sizeof(uint32_t));
+
+		uint64_t deflen_cnt = ser_int64[0];
+		uint64_t deflen_to_u64 = context.getDefaultN();
+
+		uint64_t u64_len = deflen_cnt * deflen_to_u64;
+
+		if (!already_created) {
+
+			CCC * deserialized;
+
+			if ((deflen_cnt > GPUValues::gpu_deflen_threshold) && (deflen_cnt + GPUValues::gpu_current_vram_deflen_usage < GPUValues::gpu_max_vram_deflen_usage)) {
+
+				uint64_t * ctxt = (uint64_t *)CUDA_interface::RAM_TO_VRAM_copy(ser_int64 + 1, u64_len * sizeof(uint64_t), 0);
+
+				deserialized = new CCC(&context, ctxt, deflen_cnt, true);
+			}
+			else {
+
+				uint64_t * ctxt = new uint64_t[u64_len];
+
+				if (u64_len < MTValues::cpy_m_threshold)
+					for (uint64_t i = 0; i < u64_len; i++)
+						ctxt[i] = ser_int64[1 + i];
+				else
+					Helper::u64_multithread_cpy(ser_int64 + 1, ctxt, u64_len);
+
+				deserialized = new CCC(&context, ctxt, deflen_cnt, false);
+			}
+
+			deserialized->downstream_reference_count = 0; // it will be fixed later
+
+			id_to_addr[id] = deserialized;
+		}
+
+		return (int)(deflen_cnt * deflen_to_u64 * 2 + 3);
 	}
 
 #else
@@ -1212,13 +1304,13 @@ namespace certFHE {
 		return mul_result;
 	}
 
-	uint64_t CCC::decrypt(const SecretKey & sk) {
+	uint64_t CCC::decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) {
 
 		if (OPValues::decryption_cache) {
 
-			auto cache_entry = CNODE::decryption_cached_values.find(this);
+			auto cache_entry = decryption_cached_values->find(this);
 
-			if (cache_entry != CNODE::decryption_cached_values.end())
+			if (cache_entry != decryption_cached_values->end())
 				return (uint64_t)cache_entry->second;
 		}
 
@@ -1340,7 +1432,7 @@ namespace certFHE {
 		}
 
 		if (OPValues::decryption_cache)
-			CNODE::decryption_cached_values[this] = (unsigned char)dec;
+			(*decryption_cached_values)[this] = (unsigned char)dec;
 
 		return dec;
 	}
@@ -1471,7 +1563,76 @@ namespace certFHE {
 		return to_permute;
 	}
 
+	void CCC::serialize(unsigned char * serialization_buffer, std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialization_buffer;
+		ser_int32[0] = addr_to_id.at(this).first;
+
+		uint64_t * ser_int64 = (uint64_t *)(serialization_buffer + sizeof(uint32_t));
+		ser_int64[0] = this->deflen_count;
+
+		uint64_t u64_len = this->deflen_count * this->context->getDefaultN();
+
+		if (u64_len < MTValues::cpy_m_threshold)
+			for (uint64_t i = 0; i < u64_len; i++)
+				ser_int64[i + 1] = this->ctxt[i];
+		else
+			Helper::u64_multithread_cpy(this->ctxt, ser_int64 + 1, u64_len);
+	}
+
+	int CCC::deserialize(unsigned char * serialized, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialized;
+		uint32_t id = ser_int32[0];
+
+		uint64_t * ser_int64 = (uint64_t *)(serialized + sizeof(uint32_t));
+
+		uint64_t deflen_cnt = ser_int64[0];
+		uint64_t deflen_to_u64 = context.getDefaultN();
+
+		uint64_t u64_len = deflen_cnt * deflen_to_u64;
+		
+		if (!already_created) {
+
+			uint64_t * ctxt = new uint64_t[u64_len];
+
+			if (u64_len < MTValues::cpy_m_threshold)
+				for (uint64_t i = 0; i < u64_len; i++)
+					ctxt[i] = ser_int64[1 + i];
+			else
+				Helper::u64_multithread_cpy(ser_int64 + 1, ctxt, u64_len);
+
+			CCC * deserialized = new CCC(&context, ctxt, deflen_cnt);
+			deserialized->downstream_reference_count = 0; // it will be fixed later
+
+			id_to_addr[id] = deserialized;
+		}
+
+		return (int)(deflen_cnt * deflen_to_u64 * 2 + 3);
+	}
+
 #endif
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+	void CCC::concurrency_guard_structure_rebuild(std::unordered_map <CNODE *, Ciphertext *> & node_to_ctxt, Ciphertext * associated_ctxt) {
+
+		if (node_to_ctxt.find(this) == node_to_ctxt.end()) 
+			node_to_ctxt[this] = associated_ctxt;
+
+		else 
+			associated_ctxt->concurrency_guard->set_union(node_to_ctxt.at(this)->concurrency_guard);
+	}
+
+#endif
+
+	void CCC::serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		static uint32_t temp_CCC_id = 0b100; // starting from the second possible id, to avoid having an id equal to 0
+
+		addr_to_id[this] = { temp_CCC_id, (int)(sizeof(uint32_t) + sizeof(uint64_t) + this->deflen_count * this->context->getDefaultN() * sizeof(uint64_t)) };
+		temp_CCC_id += 0b100;
+	}
 
 	std::ostream & operator << (std::ostream & out, const CCC & ccc) {
 

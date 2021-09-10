@@ -42,13 +42,29 @@ namespace certFHE {
 
 		void upstream_merging() override;
 
-		uint64_t decrypt(const SecretKey & sk) override;
+#if CERTFHE_USE_CUDA
+		uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values, std::unordered_map <CNODE *, unsigned char> * vram_decryption_cached_values) override;
+#else
+		uint64_t decrypt(const SecretKey & sk, std::unordered_map <CNODE *, unsigned char> * decryption_cached_values) override;
+#endif
 
 		CNODE * permute(const Permutation & perm, bool force_deep_copy) override;
 
 		CNODE * make_copy() override;
 
 		CNODE * make_deep_copy() override;
+
+		void serialize_recon(std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) override;
+
+		/**
+		 * Deserialization function
+		 *
+		 * already_created == false -> It ONLY creates the CMUL object, but DOES NOT populate the CNODE_list
+		 * already_created == true -> It searches in the unordered map the already created CADD object and populates its CNODE_list
+		 *
+		 * Returns the offset IN MULTIPLES OF SIZEOF(UINT32_T) BYTES (relative to the received pointer) to the next serialization ID
+		**/
+		static int deserialize(unsigned char * deserialization_buffer, std::unordered_map <uint32_t, void *> & id_to_addr, Context & context, bool already_created);
 
 		// Methods that merge two nodes
 		// Only called internally by other methods of this class

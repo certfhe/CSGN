@@ -1,5 +1,12 @@
 #include "COP.h"
 
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+#include "Ciphertext.h"
+#include "CNODE_disjoint_set.h"
+
+#endif
+
 namespace certFHE {
 
 	COP::COP(Context * context): CNODE(context) {
@@ -95,6 +102,52 @@ namespace certFHE {
 		else
 			return 0;
 	}
+
+	void COP::serialize(unsigned char * serialization_buffer, std::unordered_map <void *, std::pair<uint32_t, int>> & addr_to_id) {
+
+		uint32_t * ser_int32 = (uint32_t *)serialization_buffer;
+		ser_int32[0] = addr_to_id[this].first;
+
+		uint64_t * ser_int64 = (uint64_t *)(serialization_buffer + sizeof(uint32_t));
+
+		ser_int64[0] = this->deflen_count;
+		// ser_int64[1] completed after the next while loop
+
+		uint64_t upstream_ref_cnt = 0; 
+
+		CNODE_list * thisnodes = this->nodes->next;
+		while (thisnodes != 0 && thisnodes->current != 0) {
+
+			ser_int32[5 + upstream_ref_cnt] = addr_to_id[thisnodes->current].first;
+
+			upstream_ref_cnt += 1;
+			thisnodes = thisnodes->next;
+		}
+
+		ser_int64[1] = upstream_ref_cnt;
+	}
+
+#if CERTFHE_MULTITHREADING_EXTENDED_SUPPORT
+
+	void COP::concurrency_guard_structure_rebuild(std::unordered_map <CNODE *, Ciphertext *> & node_to_ctxt, Ciphertext * associated_ctxt) {
+
+		if (node_to_ctxt.find(this) == node_to_ctxt.end()) {
+
+			node_to_ctxt[this] = associated_ctxt;
+
+			CNODE_list * thisnodes = this->nodes->next;
+			while (thisnodes != 0 && thisnodes->current != 0) {
+
+				thisnodes->current->concurrency_guard_structure_rebuild(node_to_ctxt, associated_ctxt);
+				thisnodes = thisnodes->next;
+			}
+		}
+		else
+			associated_ctxt->concurrency_guard->set_union(node_to_ctxt.at(this)->concurrency_guard);
+	}
+
+#endif
+
 }
 
 

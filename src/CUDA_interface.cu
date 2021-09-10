@@ -63,8 +63,6 @@ namespace certFHE {
 		int to_permute_deflen_offset = blockDim.x * blockIdx.x + threadIdx.x;
 		int to_permute_deflen_stride = blockDim.x * gridDim.x;
 
-		int local_decryption_result = 1;
-
 		for (int to_permute_deflen_i = to_permute_deflen_offset; to_permute_deflen_i < to_permute_deflen_cnt; to_permute_deflen_i += to_permute_deflen_stride) {
 
 			uint64_t * current_chunk = to_permute + to_permute_deflen_i * deflen_to_uint64;

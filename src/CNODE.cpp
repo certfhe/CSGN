@@ -2,8 +2,6 @@
 
 namespace certFHE {
 
-	std::unordered_map <CNODE *, unsigned char> CNODE::decryption_cached_values;
-
 	CNODE::CNODE(const CNODE & other) {
 
 		this->deflen_count = other.deflen_count;

@@ -12,6 +12,7 @@ namespace certFHE{
 		for (uint64_t i = 0; i < length; i++) {
 			for (uint64_t j = 0; j < length; j++) {
 				
+
 				if (permutation[j] == i) {
 
 					p[i] = j; 
@@ -26,9 +27,62 @@ namespace certFHE{
 		for (int i = 0; i < this_invcnt; i++)
 			inverseInvs[i] = this->inversions[this_invcnt - 1 - i];
     
-		Permutation invP(p, length, this_invcnt, inverseInvs);
+		Permutation invP(p, length, inverseInvs, this_invcnt);
 		delete[] p;
+
 		return invP;
+	}
+
+	std::pair<unsigned char *, int> Permutation::serialize() const {
+
+		int ser_byte_length = 2 + (int)this->length + 4 * (int)this->inversions_cnt;
+
+		uint64_t * serialization = new uint64_t[ser_byte_length];
+
+		serialization[0] = this->length;
+		serialization[1] = this->inversions_cnt;
+
+		for (int i = 0; i < serialization[0]; i++)
+			serialization[2 + i] = this->permutation[i];
+		
+		for (int i = 0; i < serialization[1]; i++) {
+
+			serialization[2 + this->length + 4 * i] = this->inversions[i].fst_u64_ch;
+			serialization[2 + this->length + 4 * i + 1] = this->inversions[i].fst_u64_r;
+			serialization[2 + this->length + 4 * i + 2] = this->inversions[i].snd_u64_ch;
+			serialization[2 + this->length + 4 * i + 3] = this->inversions[i].snd_u64_r;
+		}
+
+		return { (unsigned char *)serialization, ser_byte_length };
+	}
+
+	Permutation Permutation::deserialize(unsigned char * serialization) {
+
+		uint64_t * ser_int64 = (uint64_t *)serialization;
+
+		uint64_t length = ser_int64[0];
+		uint64_t inv_cnt = ser_int64[1];
+
+		uint64_t * perm = new uint64_t[length];
+		PermInversion * invs = new PermInversion[inv_cnt];
+
+		for (int i = 0; i < length; i++)
+			perm[i] = ser_int64[2 + i];
+
+		for (int i = 0; i < inv_cnt; i++) {
+
+			invs[i].fst_u64_ch = serialization[2 + length + 4 * i];
+			invs[i].fst_u64_r = serialization[2 + length + 4 * i + 1];
+			invs[i].snd_u64_ch = serialization[2 + length + 4 * i + 2];
+			invs[i].snd_u64_r = serialization[2 + length + 4 * i + 3];
+		}
+
+		Permutation to_return(perm, length, invs, inv_cnt);
+
+		delete[] perm;
+		delete[] invs;
+
+		return to_return;
 	}
 
 #pragma endregion
@@ -105,7 +159,7 @@ namespace certFHE{
 		for (i; i < this_invcnt + other_invcnt; i++)
 			resultInvs[i] = other.inversions[i - this_invcnt];
 
-		Permutation result(p, length, this_invcnt + other_invcnt, resultInvs);
+		Permutation result(p, length, resultInvs, this_invcnt + other_invcnt);
 
 		delete[] p;
 		delete[] resultInvs;
@@ -252,7 +306,7 @@ namespace certFHE{
 
 	}
 
-	Permutation::Permutation(const uint64_t * perm, const uint64_t len, uint64_t inv_cnt, const PermInversion * invs) {
+	Permutation::Permutation(const uint64_t * perm, const uint64_t len, const PermInversion * invs, const uint64_t inv_cnt) {
 
 		this->permutation = new uint64_t[len];
 		this->inversions = new PermInversion[inv_cnt];
